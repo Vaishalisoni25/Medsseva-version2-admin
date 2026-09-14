@@ -63,6 +63,15 @@ export const finalizeReportThunk = createAsyncThunk('reports/finalize', async (i
   }
 });
 
+export const verifyReportThunk = createAsyncThunk('reports/verify', async (id: string, { rejectWithValue }) => {
+  try {
+    const res = await api.patch(`/reports/${id}/verify`);
+    return res.data;
+  } catch (e: any) {
+    return rejectWithValue(e.response?.data?.error || 'Failed to submit report for review');
+  }
+});
+
 export const sendReportThunk = createAsyncThunk('reports/send', async ({ id, recipientType, recipientId, channels }: { id: string; recipientType: string; recipientId: string; channels?: string[] }, { rejectWithValue }) => {
   try {
     const res = await api.patch(`/reports/${id}/send`, { recipientType, recipientId, channels });
@@ -109,6 +118,10 @@ const reportSlice = createSlice({
         if (idx !== -1) state.reports[idx] = action.payload;
       })
       .addCase(finalizeReportThunk.fulfilled, (state, action) => {
+        const idx = state.reports.findIndex(r => r.id === action.payload.id);
+        if (idx !== -1) state.reports[idx] = action.payload;
+      })
+      .addCase(verifyReportThunk.fulfilled, (state, action) => {
         const idx = state.reports.findIndex(r => r.id === action.payload.id);
         if (idx !== -1) state.reports[idx] = action.payload;
       })

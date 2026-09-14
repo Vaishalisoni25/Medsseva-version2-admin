@@ -75,6 +75,7 @@ const { isLoading: bookingsQueryLoading } = useBookingsQuery();
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [assignmentTab, setAssignmentTab] = useState<'PHLEBOTOMIST' | 'STAFF'>('PHLEBOTOMIST');
   const [assignType, setAssignType] = useState<'phlebotomist' | 'technician'>('phlebotomist');
 const [executives, setExecutives] = useState<any[]>([]);
   const [availablePartners, setAvailablePartners] = useState<any[]>([]);
@@ -765,23 +766,15 @@ const getStaffName = (id?: string) => {
                             </p>
                           </div>
                         ) : (
-                          <>
-                            <button 
-                              onClick={() => {
-                                setAssignType('phlebotomist');
-                                setIsAssigning(true);
-                              }}
-                              className="px-3 py-1.5 bg-primary text-white rounded text-xs font-bold flex items-center gap-1"
-                            >
-                              <UserPlus className="h-3.5 w-3.5" /> Assign Lab Assistant
-                            </button>
-                            <button
-                              onClick={() => setIsAssigningPartner(true)}
-                              className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 flex items-center gap-1"
-                            >
-                              <UserPlus className="h-3.5 w-3.5" /> Assign Partner
-                            </button>
-                          </>
+                          <button 
+                            onClick={() => {
+                              setAssignmentTab('PHLEBOTOMIST');
+                              setIsAssigning(true);
+                            }}
+                            className="px-3.5 py-1.5 bg-[#006d6f] hover:bg-[#00595b] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                          >
+                            <UserPlus className="h-3.5 w-3.5" /> Assign Staff / Phlebotomist
+                          </button>
                         )}
                       </>
                     )}
@@ -1189,104 +1182,167 @@ const getStaffName = (id?: string) => {
             </motion.div>
 
          
-            <AnimatePresence>
-              {isAssigningPartner && (
-                <>
-                  <motion.div
-                    initial={{ opacity: 0 }} animate={{ opacity: 0.3 }} exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black z-55 cursor-pointer"
-                    onClick={() => setIsAssigningPartner(false)}
-                  />
-                  <motion.div
-                    initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-                    className="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-background rounded-t-2xl border-t border-border p-6 z-[60] shadow-3xl"
-                  >
-                    <div className="flex items-center justify-between pb-4 border-b border-border">
-                      <h3 className="font-bold text-foreground">Assign Pathology Partner</h3>
-                      <button onClick={() => setIsAssigningPartner(false)} className="p-1.5 hover:bg-muted rounded-lg">
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="mt-4 space-y-2 max-h-[300px] overflow-y-auto">
-                      {availablePartners.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">No available partners right now.</div>
-                      ) : availablePartners.map((partner: any) => (
-                        <button
-                          key={partner.id}
-                          onClick={() => handleAssignPartner(partner.id, partner.user?.name || partner.labName)}
-                          className="w-full flex items-center justify-between p-3 border border-border hover:border-indigo-500 bg-card rounded-lg text-left group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold uppercase">
-                              {(partner.user?.name || partner.labName).charAt(0)}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-foreground text-sm">{partner.user?.name || 'Partner'}</div>
-                              <div className="text-xs text-muted-foreground">{partner.labName} · {partner.role}</div>
-                            <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
-  <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-  {partner.rating?.toFixed(1) || '0.0'}
-</div>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-
-        
+            {/* Unified Assignment Modal */}
             <AnimatePresence>
               {isAssigning && (
                 <>
                   <motion.div 
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.3 }}
+                    animate={{ opacity: 0.4 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black z-55 cursor-pointer"
+                    className="fixed inset-0 bg-black z-55 cursor-pointer backdrop-blur-xs"
                     onClick={() => setIsAssigning(false)}
                   />
                   <motion.div
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
-                    className="fixed inset-x-0 bottom-0 max-w-md mx-auto bg-background rounded-t-2xl border-t border-border p-6 z-[60] shadow-3xl"
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="fixed inset-x-0 bottom-0 max-w-lg mx-auto bg-background rounded-t-2xl border-t border-border p-6 z-[60] shadow-3xl"
                   >
-                    <div className="flex items-center justify-between pb-4 border-b border-border">
-                      <h3 className="font-bold text-foreground">
-                        Select {assignType === 'phlebotomist' ? 'Phlebotomist' : 'Technician'}
-                      </h3>
-                      <button onClick={() => setIsAssigning(false)} className="p-1.5 hover:bg-muted rounded-lg">
+                    <div className="flex items-center justify-between pb-3 border-b border-border">
+                      <div>
+                        <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                          <UserPlus className="h-4 w-4 text-primary" /> Assign Booking
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedBooking?.bookingCode} • {selectedBooking?.patient?.name}
+                        </p>
+                      </div>
+                      <button onClick={() => setIsAssigning(false)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground">
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                  <div className="mt-4 space-y-2 max-h-[300px] overflow-y-auto">
-                     
-                     {((selectedBooking as any)?.collectionMode === 'HOME'
-                        ? allExecutives
-                        : assignType === 'phlebotomist' ? phlebotomists : technicians
-                      ).map(user => (
-                        <button
-                          key={user.id}
-                          onClick={() => handleAssign(user.id)}
-                          className="w-full flex items-center justify-between p-3 border border-border hover:border-primary bg-card rounded-lg text-left group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold uppercase">
-                              {user.name.charAt(0)}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-foreground text-sm">{user.name}</div>
-                              <div className="text-xs text-muted-foreground">{user.phone}</div>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </button>
-                      ))}
+
+                    {/* Segmented Tab Switcher */}
+                    <div className="flex bg-muted/60 p-1 rounded-xl my-4 border border-border">
+                      <button
+                        onClick={() => setAssignmentTab('PHLEBOTOMIST')}
+                        className={cn(
+                          "flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                          assignmentTab === 'PHLEBOTOMIST'
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Freelance Phlebotomist (30%)
+                      </button>
+                      <button
+                        onClick={() => setAssignmentTab('STAFF')}
+                        className={cn(
+                          "flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                          assignmentTab === 'STAFF'
+                            ? "bg-slate-800 text-white shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        In-House Staff
+                      </button>
                     </div>
+
+                    {/* Phlebotomist List */}
+                    {assignmentTab === 'PHLEBOTOMIST' && (
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                        <div className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 mb-2">
+                          💡 Freelance Phlebotomist gets <span className="font-bold">30% commission</span> (₹{Math.round(((selectedBooking as any)?.totalPaid || selectedBooking?.totalAmount || 0) * 0.30)}) upon successful sample collection and lab delivery.
+                        </div>
+
+                        {(() => {
+                          const phlebos = availablePartners.filter((p: any) => {
+                            if (!selectedBooking?.branchId) return true;
+                            return !p.branchId || p.branchId === selectedBooking.branchId;
+                          });
+
+                          if (phlebos.length === 0) {
+                            return (
+                              <div className="text-center py-8 text-muted-foreground text-xs">
+                                No active freelance phlebotomists found for this branch.
+                              </div>
+                            );
+                          }
+
+                          return phlebos.map((partner: any) => {
+                            const partnerName = partner.user?.name || partner.labName || 'Phlebotomist';
+                            const estCommission = Math.round(((selectedBooking as any)?.totalPaid || selectedBooking?.totalAmount || 0) * 0.30);
+
+                            return (
+                              <button
+                                key={partner.id}
+                                onClick={() => handleAssignPartner(partner.id, partnerName)}
+                                className="w-full flex items-center justify-between p-3 border border-border hover:border-emerald-500 bg-card rounded-xl text-left group transition-all hover:bg-emerald-50/20"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold uppercase shrink-0">
+                                    {partnerName.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-foreground text-xs sm:text-sm flex items-center gap-2">
+                                      {partnerName}
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                        30% Comm
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
+                                      <span>{partner.partnerCode || 'PHLEBO'}</span>
+                                      <span>•</span>
+                                      <span className="flex items-center gap-0.5 text-amber-600 font-bold">
+                                        <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                                        {partner.rating?.toFixed(1) || '5.0'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs font-bold text-emerald-700">₹{estCommission}</div>
+                                  <div className="text-[10px] text-muted-foreground">Payout</div>
+                                </div>
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
+
+                    {/* In-House Staff List */}
+                    {assignmentTab === 'STAFF' && (
+                      <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                        <div className="text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg p-2.5 mb-2">
+                          🏢 In-House Staff member assignment (Salary-based internal team).
+                        </div>
+
+                        {(() => {
+                          const staffList = allExecutives;
+                          if (staffList.length === 0) {
+                            return (
+                              <div className="text-center py-8 text-muted-foreground text-xs">
+                                No active in-house staff found for this branch.
+                              </div>
+                            );
+                          }
+
+                          return staffList.map((user: any) => (
+                            <button
+                              key={user.id}
+                              onClick={() => handleAssign(user.id)}
+                              className="w-full flex items-center justify-between p-3 border border-border hover:border-slate-800 bg-card rounded-xl text-left group transition-all hover:bg-slate-50"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-slate-200 text-slate-800 flex items-center justify-center text-sm font-bold uppercase shrink-0">
+                                  {user.name?.charAt(0) || 'S'}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-foreground text-xs sm:text-sm">{user.name}</div>
+                                  <div className="text-[11px] text-muted-foreground">{user.phone || user.mobile || 'In-House Staff'}</div>
+                                </div>
+                              </div>
+                              <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          ));
+                        })()}
+                      </div>
+                    )}
                   </motion.div>
                 </>
               )}

@@ -40,6 +40,35 @@ import { sanitizeClonedDocForPdf } from '@/utils/exportInvoicePdf';
 
 export const ReportApprovalPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const currentUser = useAppSelector(state => state.auth.user);
+  const userBranchId = (currentUser as any)?.branchId || (currentUser as any)?.adminUser?.branchId;
+
+  const isSuperAdmin =
+    currentUser?.role === 'super_admin' ||
+    currentUser?.role === 'SUPER_ADMIN' ||
+    currentUser?.adminRoleSlug === 'super_admin' ||
+    (currentUser as any)?.isSuperAdmin;
+
+  const isBranchAdmin =
+    !isSuperAdmin &&
+    (currentUser?.role === 'ADMIN' ||
+      currentUser?.role === 'franchise_admin' ||
+      currentUser?.adminRoleSlug === 'branch_admin' ||
+      currentUser?.adminRoleSlug === 'admin' ||
+      currentUser?.adminRole === 'Branch Admin' ||
+      !!userBranchId);
+
+  const canApproveReport = useCallback((report: any) => {
+    if (!report) return false;
+    if (isSuperAdmin) return true;
+    if (isBranchAdmin) {
+      if (!userBranchId || userBranchId === 'all') return true;
+      const rBranch = report?.reportBranchId || report?.booking?.branchId;
+      return !rBranch || rBranch === userBranchId;
+    }
+    return false;
+  }, [isSuperAdmin, isBranchAdmin, userBranchId]);
+
   const { reports, bookingsForReport, loading } = useAppSelector(state => state.reports);
 
   const [selectedReport, setSelectedReport] = useState<any>(null);
@@ -251,6 +280,11 @@ export const ReportApprovalPage: React.FC = () => {
 
 const handleFinalize = async () => {
     if (!selectedReport) return;
+    if (!canApproveReport(selectedReport)) {
+      toast.error('Permission Denied', 'Only Super Admin or Branch Admin can approve reports.');
+      setShowFinalizeConfirm(false);
+      return;
+    }
     setFinalizing(true);
     try {
       const finalized = await dispatch(finalizeReportThunk(selectedReport.id)).unwrap();
@@ -536,12 +570,21 @@ const handleFinalize = async () => {
                       {generatingPDF ? 'Generating...' : uploadingPDF ? 'Uploading PDF...' : selectedReport?.pdfUrl ? 'Download PDF' : 'Generate & Download'}
                     </button>
                     {(selectedReport.status === 'DRAFT' || selectedReport.status === 'UNDER_REVIEW') && (
-                      <button
-                        onClick={() => setShowFinalizeConfirm(true)}
-                        className="px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded text-[11px] font-bold flex items-center gap-1 shadow-sm"
-                      >
-                        <CheckSquare className="h-3.5 w-3.5" /> Finalize Report
-                      </button>
+                      canApproveReport(selectedReport) ? (
+                        <button
+                          onClick={() => setShowFinalizeConfirm(true)}
+                          className="px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded text-[11px] font-bold flex items-center gap-1 shadow-sm"
+                        >
+                          <CheckSquare className="h-3.5 w-3.5" /> Finalize & Approve Report
+                        </button>
+                      ) : (
+                        <div
+                          className="px-2.5 py-1.5 bg-muted text-muted-foreground border border-border rounded text-[11px] font-semibold flex items-center gap-1"
+                          title="Approval restricted: Only Super Admin or Branch Admin can approve this report"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" /> Approval Restricted (Admin Only)
+                        </div>
+                      )
                     )}
                     {selectedReport.status === 'APPROVED' && (
                       <button

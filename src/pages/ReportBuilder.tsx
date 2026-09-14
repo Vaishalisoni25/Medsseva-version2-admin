@@ -5,7 +5,7 @@ import {
   fetchBookingsForReport,
   createReportThunk,
   updateReportDraftThunk,
-  finalizeReportThunk,
+  verifyReportThunk,
   fetchAllReports,
 } from '../redux/slices/reportSlice';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,6 +28,7 @@ import {
   Check,
   Loader2,
   Sparkles,
+  FileCheck,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { branchService, Branch } from '../services/branch.service';
@@ -632,7 +633,7 @@ export const ReportBuilderPage: React.FC = () => {
     }
   };
 
-  const handleSaveAndFinalize = async () => {
+  const handleGenerateReport = async () => {
     if (!selectedBooking) return;
     setSaving(true);
     try {
@@ -646,13 +647,14 @@ export const ReportBuilderPage: React.FC = () => {
         repId = created.id;
       }
       if (repId) {
-        await dispatch(finalizeReportThunk(repId)).unwrap();
+        // Submit for review / approval so it is not auto-approved
+        await dispatch(verifyReportThunk(repId)).unwrap();
       }
       await dispatch(fetchAllReports());
-      toast.success('Report Finalized', 'Report has been generated, finalized, and digitally verified.');
+      toast.success('Report Generated', 'Report has been generated and submitted for approval. Awaiting review by Admin.');
       setSelectedBooking(null);
     } catch (e: any) {
-      toast.error('Finalize failed', typeof e === 'string' ? e : 'Failed to finalize report. Please try again.');
+      toast.error('Submission failed', typeof e === 'string' ? e : 'Failed to generate report. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -1613,8 +1615,8 @@ const filteredBookings = useMemo(() => {
                   <button onClick={handleSaveDraft} disabled={saving} className="px-4 py-2.5 border border-border hover:bg-muted rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-60">
                     <Save className="h-3.5 w-3.5" /> {saving ? 'Saving...' : 'Save Draft'}
                   </button>
-                  <button onClick={handleSaveAndFinalize} disabled={saving} className="px-6 py-2.5 bg-primary text-white hover:bg-primary/90 rounded-lg text-xs font-black flex items-center justify-center gap-2 shadow-sm disabled:opacity-60">
-                    <Sparkles className="h-4 w-4" /> {saving ? 'Processing...' : 'Save & Finalize Report'}
+                  <button onClick={handleGenerateReport} disabled={saving} className="px-6 py-2.5 bg-primary text-white hover:bg-primary/90 rounded-lg text-xs font-black flex items-center justify-center gap-2 shadow-sm disabled:opacity-60">
+                    <FileCheck className="h-4 w-4" /> {saving ? 'Submitting...' : 'Generate & Submit for Approval'}
                   </button>
                 </div>
               </motion.div>

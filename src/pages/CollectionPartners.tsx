@@ -36,6 +36,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAppSelector } from '../redux/hooks';
 import { collectionPartnerService } from '../services/api';
 import { cn } from '../utils/cn';
 
@@ -156,6 +157,8 @@ const COLLECTION_STATUS_STYLES: Record<string, { bg: string; text: string; label
 };
 
 export const CollectionPartnersPage: React.FC = () => {
+  const currentBranchId = useAppSelector(state => state.auth.currentBranchId);
+
   // Tabs
   const [activeTab, setActiveTab] = useState<'DIRECTORY' | 'LAB_MAPPING' | 'DAILY_SUMMARY' | 'LAB_WISE' | 'COMMISSION_WALLET'>('DIRECTORY');
 
@@ -234,9 +237,12 @@ export const CollectionPartnersPage: React.FC = () => {
     else setLoading(true);
 
     try {
+      const effectiveBranchId = (currentBranchId && currentBranchId !== 'all') ? currentBranchId : (selectedLab !== 'ALL' ? selectedLab : undefined);
+
       const queryParams: any = {
         search: search || undefined,
-        labId: selectedLab !== 'ALL' ? selectedLab : undefined,
+        labId: effectiveBranchId,
+        branchId: effectiveBranchId,
         status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
         date: dateFilter || undefined,
         startDate: startDate || undefined,
@@ -244,7 +250,7 @@ export const CollectionPartnersPage: React.FC = () => {
       };
 
       const [summaryRes, partnersRes, dailyRes, labWiseRes] = await Promise.all([
-        collectionPartnerService.getSummary(),
+        collectionPartnerService.getSummary({ branchId: effectiveBranchId }),
         collectionPartnerService.getPartners(queryParams),
         collectionPartnerService.getDailySummary(queryParams),
         collectionPartnerService.getLabWise(queryParams),
@@ -261,7 +267,7 @@ export const CollectionPartnersPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [search, selectedLab, selectedStatus, dateFilter, startDate, endDate]);
+  }, [currentBranchId, search, selectedLab, selectedStatus, dateFilter, startDate, endDate]);
 
   useEffect(() => {
     fetchData();

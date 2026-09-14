@@ -243,8 +243,8 @@ rejectLabBooking: async (id: string, reason: string) => {
     const response = await api.post(`/bookings/${id}/send-invoice`);
     return response.data;
   },
-  getAvailablePartners: async () => {
-    const response = await api.get('/auth/partners/available');
+  getAvailablePartners: async (params?: { branchId?: string; cityId?: string }) => {
+    const response = await api.get('/auth/partners/available', { params });
     return response.data;
   },
   getPartners: async (status?: string) => {
@@ -443,14 +443,14 @@ export interface SystemSettings {
 export type SettingsUpdateDTO = Partial<Omit<SystemSettings, 'id' | 'updatedBy' | 'updatedAt' | 'createdAt'>>;
 
 export const collectionPartnerService = {
-  getSummary: () => api.get('/collection-partners/summary').then(r => r.data),
-  getPartners: (params?: { search?: string; labId?: string; status?: string; date?: string; startDate?: string; endDate?: string }) =>
+  getSummary: (params?: { branchId?: string; labId?: string }) => api.get('/collection-partners/summary', { params }).then(r => r.data),
+  getPartners: (params?: { search?: string; labId?: string; branchId?: string; status?: string; date?: string; startDate?: string; endDate?: string }) =>
     api.get('/collection-partners', { params }).then(r => r.data),
-  getPartnerDetails: (id: string, params?: { date?: string; startDate?: string; endDate?: string; status?: string; labId?: string }) =>
+  getPartnerDetails: (id: string, params?: { date?: string; startDate?: string; endDate?: string; status?: string; labId?: string; branchId?: string }) =>
     api.get(`/collection-partners/${id}`, { params }).then(r => r.data),
-  getDailySummary: (params?: { partnerId?: string; labId?: string; status?: string; date?: string; startDate?: string; endDate?: string }) =>
+  getDailySummary: (params?: { partnerId?: string; labId?: string; branchId?: string; status?: string; date?: string; startDate?: string; endDate?: string }) =>
     api.get('/collection-partners/daily-summary', { params }).then(r => r.data),
-  getLabWise: (params?: { partnerId?: string; labId?: string; date?: string; startDate?: string; endDate?: string }) =>
+  getLabWise: (params?: { partnerId?: string; labId?: string; branchId?: string; date?: string; startDate?: string; endDate?: string }) =>
     api.get('/collection-partners/lab-wise', { params }).then(r => r.data),
   updatePartnerStatus: (id: string, data: any) =>
     api.patch(`/collection-partners/${id}/status`, data).then(r => r.data),
