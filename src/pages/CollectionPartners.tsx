@@ -34,9 +34,13 @@ import {
   Receipt,
   Layers,
   Sparkles,
+  GraduationCap,
+  FileText,
+  ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppSelector } from '../redux/hooks';
+import { useBranchesQuery } from '@/hooks/useAdminQueries';
 import { collectionPartnerService } from '../services/api';
 import { cn } from '../utils/cn';
 
@@ -48,6 +52,14 @@ interface LabMapping {
   totalTestValue: number;
   collectionCommission: number;
   walletCredited: number;
+}
+
+export interface PartnerDocumentItem {
+  id: string;
+  documentType: string;
+  fileName: string;
+  fileUrl: string;
+  status: string;
 }
 
 interface CollectionPartner {
@@ -64,6 +76,10 @@ interface CollectionPartner {
   labName: string;
   role: string;
   address: string | null;
+  qualification?: string;
+  experience?: string;
+  serviceArea?: string;
+  documents?: PartnerDocumentItem[];
   assignedLab: { id: string; name: string; city: string } | null;
   commissionRate: number;
   paymentCycle: string;
@@ -158,6 +174,11 @@ const COLLECTION_STATUS_STYLES: Record<string, { bg: string; text: string; label
 
 export const CollectionPartnersPage: React.FC = () => {
   const currentBranchId = useAppSelector(state => state.auth.currentBranchId);
+  const currentUser = useAppSelector(state => state.auth.user);
+  const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'SUPER_ADMIN' || (currentUser as any)?.isSuperAdmin;
+  const userBranchId = (currentUser as any)?.branchId || (currentUser as any)?.adminUser?.branchId || (currentBranchId && currentBranchId !== 'all' ? currentBranchId : undefined);
+
+  const { data: branchesData } = useBranchesQuery();
 
   // Tabs
   const [activeTab, setActiveTab] = useState<'DIRECTORY' | 'LAB_MAPPING' | 'DAILY_SUMMARY' | 'LAB_WISE' | 'COMMISSION_WALLET'>('DIRECTORY');
@@ -173,6 +194,25 @@ export const CollectionPartnersPage: React.FC = () => {
     branches: { id: string; name: string; city: string }[];
   } | null>(null);
 
+  // Branches list merged from useBranchesQuery & summary.branches
+  const branches = useMemo(() => {
+    return (branchesData && branchesData.length > 0) ? branchesData : (summary?.branches || []);
+  }, [branchesData, summary?.branches]);
+
+  const accessibleBranches = useMemo(() => {
+    if (!isSuperAdmin && userBranchId) {
+      return branches.filter((b: any) => b.id === userBranchId);
+    }
+    return branches;
+  }, [branches, isSuperAdmin, userBranchId]);
+
+  const uniqueLocations = useMemo(() => {
+    const locs: string[] = accessibleBranches
+      .map((b: any) => b.city)
+      .filter((c: any): c is string => Boolean(c && typeof c === 'string' && c.trim()));
+    return Array.from(new Set(locs)).sort((a, b) => a.localeCompare(b));
+  }, [accessibleBranches]);
+
   // Main Data States
   const [partners, setPartners] = useState<CollectionPartner[]>([]);
   const [dailySummary, setDailySummary] = useState<DailySummaryItem[]>([]);
@@ -182,11 +222,27 @@ export const CollectionPartnersPage: React.FC = () => {
 
   // Filters State
   const [search, setSearch] = useState('');
+  const [locationFilter, setLocationFilter] = useState('ALL');
   const [selectedLab, setSelectedLab] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [dateFilter, setDateFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  const locationFilteredBranches = useMemo(() => {
+    if (locationFilter === 'ALL') return accessibleBranches;
+    return accessibleBranches.filter((b: any) => (b.city || '').toLowerCase() === locationFilter.toLowerCase());
+  }, [accessibleBranches, locationFilter]);
+
+  useEffect(() => {
+    if (!isSuperAdmin && userBranchId) {
+      setSelectedLab(userBranchId);
+      const myBranch = branches.find((b: any) => b.id === userBranchId);
+      if (myBranch?.city) {
+        setLocationFilter(myBranch.city);
+      }
+    }
+  }, [isSuperAdmin, userBranchId, branches]);
 
   // Expandable row states for partner table
   const [expandedPartnerIds, setExpandedPartnerIds] = useState<Set<string>>(new Set());
@@ -237,12 +293,19 @@ export const CollectionPartnersPage: React.FC = () => {
     else setLoading(true);
 
     try {
-      const effectiveBranchId = (currentBranchId && currentBranchId !== 'all') ? currentBranchId : (selectedLab !== 'ALL' ? selectedLab : undefined);
+      const effectiveBranchId = (!isSuperAdmin && userBranchId)
+        ? userBranchId
+        : (selectedLab !== 'ALL' ? selectedLab : undefined);
+
+      const effectiveCity = (!isSuperAdmin && userBranchId)
+        ? undefined
+        : (effectiveBranchId ? undefined : (locationFilter !== 'ALL' ? locationFilter : undefined));
 
       const queryParams: any = {
         search: search || undefined,
         labId: effectiveBranchId,
         branchId: effectiveBranchId,
+        city: effectiveCity,
         status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
         date: dateFilter || undefined,
         startDate: startDate || undefined,
@@ -250,7 +313,7 @@ export const CollectionPartnersPage: React.FC = () => {
       };
 
       const [summaryRes, partnersRes, dailyRes, labWiseRes] = await Promise.all([
-        collectionPartnerService.getSummary({ branchId: effectiveBranchId }),
+        collectionPartnerService.getSummary({ branchId: effectiveBranchId, city: effectiveCity } as any),
         collectionPartnerService.getPartners(queryParams),
         collectionPartnerService.getDailySummary(queryParams),
         collectionPartnerService.getLabWise(queryParams),
@@ -267,7 +330,7 @@ export const CollectionPartnersPage: React.FC = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentBranchId, search, selectedLab, selectedStatus, dateFilter, startDate, endDate]);
+  }, [isSuperAdmin, userBranchId, search, locationFilter, selectedLab, selectedStatus, dateFilter, startDate, endDate]);
 
   useEffect(() => {
     fetchData();
@@ -709,7 +772,7 @@ export const CollectionPartnersPage: React.FC = () => {
         {/* Global Search and Filter Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-12 gap-3 items-center">
           {/* Search Box: Name, Mobile, Email */}
-          <div className="relative lg:col-span-4">
+          <div className="relative lg:col-span-3">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
@@ -728,15 +791,42 @@ export const CollectionPartnersPage: React.FC = () => {
             )}
           </div>
 
-          {/* Lab Partner Filter */}
+          {/* Location / City Filter */}
+          <div className="lg:col-span-2">
+            <select
+              value={locationFilter}
+              onChange={(e) => {
+                const newLoc = e.target.value;
+                setLocationFilter(newLoc);
+                if (newLoc !== 'ALL') {
+                  const isStillValid = locationFilteredBranches.some((b: any) => b.id === selectedLab && (b.city || '').toLowerCase() === newLoc.toLowerCase());
+                  if (!isStillValid) setSelectedLab('ALL');
+                }
+              }}
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0a7c7c]/30 focus:border-[#0a7c7c] text-foreground transition-all font-medium"
+            >
+              {isSuperAdmin && <option value="ALL">All Locations / Cities</option>}
+              {uniqueLocations.map((loc: string) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Branch / Destination Lab Filter */}
           <div className="lg:col-span-3">
             <select
               value={selectedLab}
               onChange={(e) => setSelectedLab(e.target.value)}
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0a7c7c]/30 focus:border-[#0a7c7c] text-foreground transition-all"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-muted/30 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0a7c7c]/30 focus:border-[#0a7c7c] text-foreground transition-all font-medium"
             >
-              <option value="ALL">All Lab Partners / Destination Labs</option>
-              {summary?.branches?.map((b) => (
+              {isSuperAdmin && (
+                <option value="ALL">
+                  {locationFilter === 'ALL' ? 'All Branches / Partners' : `All ${locationFilter} Branches`}
+                </option>
+              )}
+              {locationFilteredBranches.map((b: any) => (
                 <option key={b.id} value={b.id}>
                   {b.name} ({b.city})
                 </option>
@@ -851,7 +941,14 @@ export const CollectionPartnersPage: React.FC = () => {
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-semibold text-foreground truncate">{p.name}</p>
-                                  <p className="text-[11px] text-muted-foreground font-mono">{p.partnerCode}</p>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <p className="text-[11px] text-muted-foreground font-mono">{p.partnerCode}</p>
+                                    {p.qualification && p.qualification !== 'Not Specified' && (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400">
+                                        {p.qualification}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </td>
@@ -1434,6 +1531,82 @@ export const CollectionPartnersPage: React.FC = () => {
                   </div>
                 ) : (
                   <>
+                    {/* Phlebotomist Profile & Verification Details Card */}
+                    <div className="bg-card p-4 rounded-xl border border-border/80 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between border-b border-border/40 pb-2.5">
+                        <span className="font-semibold text-xs text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <GraduationCap className="w-4 h-4 text-[#0a7c7c]" />
+                          Phlebotomist Profile & Verification Details
+                        </span>
+                        {partnerDetails.partner.qualification && partnerDetails.partner.qualification !== 'Not Specified' && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20">
+                            {partnerDetails.partner.qualification}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        <div className="p-2.5 bg-muted/30 border border-border/60 rounded-lg">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Qualification / Certification</span>
+                          <span className="font-bold text-foreground text-sm mt-0.5 block">
+                            {partnerDetails.partner.qualification || 'Not Specified'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-muted/30 border border-border/60 rounded-lg">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Experience / Designation</span>
+                          <span className="font-medium text-foreground mt-0.5 block truncate" title={partnerDetails.partner.experience || 'N/A'}>
+                            {partnerDetails.partner.experience || 'Standard Experience'}
+                          </span>
+                        </div>
+                        <div className="p-2.5 bg-muted/30 border border-border/60 rounded-lg">
+                          <span className="text-[11px] text-muted-foreground block font-medium">Preferred Service Area</span>
+                          <span className="font-medium text-foreground mt-0.5 block truncate" title={partnerDetails.partner.serviceArea || partnerDetails.partner.address || 'Independent'}>
+                            {partnerDetails.partner.serviceArea || partnerDetails.partner.address || 'Independent'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Government ID Documents (Aadhaar / PAN Card) */}
+                      <div className="pt-2 border-t border-border/40">
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+                          Attached Government ID Proof (Aadhaar / PAN Card)
+                        </span>
+                        {partnerDetails.partner.documents && partnerDetails.partner.documents.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {partnerDetails.partner.documents.map((doc, idx) => (
+                              <div key={idx} className="p-3 bg-muted/30 border border-border rounded-xl flex items-center justify-between">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-[#0a7c7c] flex items-center justify-center flex-shrink-0">
+                                    <FileText className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-semibold text-xs text-foreground truncate">
+                                      {doc.documentType === 'PAN_CARD' ? 'PAN Card' : 'Aadhaar Card'}
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground truncate">{doc.fileName}</p>
+                                  </div>
+                                </div>
+                                <a
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-3 py-1.5 rounded-lg bg-[#0a7c7c] text-white hover:bg-[#086363] text-xs font-medium flex items-center gap-1.5 shadow-sm transition-all flex-shrink-0"
+                                >
+                                  <span>View Document</span>
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                            <Clock className="w-4 h-4 flex-shrink-0" />
+                            <span>No government ID document uploaded yet.</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Partner Totals Card (Requirement 4) */}
                     <div className="bg-muted/20 p-4 rounded-xl border border-border/60 space-y-3">
                       <div className="flex items-center justify-between border-b border-border/40 pb-2">
@@ -1633,8 +1806,8 @@ export const CollectionPartnersPage: React.FC = () => {
                                             Credit Wallet
                                           </button>
                                         ) : (
-                                          <span className="text-[10px] font-mono text-muted-foreground" title={item.walletTransactionRef}>
-                                            {item.walletTransactionRef.slice(0, 10)}...
+                                          <span className="text-[10px] font-mono text-muted-foreground" title={item.walletTransactionRef || 'N/A'}>
+                                            {item.walletTransactionRef ? `${item.walletTransactionRef.slice(0, 10)}...` : 'Credited'}
                                           </span>
                                         )}
                                       </td>

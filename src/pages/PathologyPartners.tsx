@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { usePartnersQuery } from '@/hooks/useAdminQueries';
+import { usePartnersQuery, useBranchesQuery } from '@/hooks/useAdminQueries';
 import { testService, commissionService } from '../services/api';
 import { customFormatService } from '@/services/customFormat.service';
 import { exportInvoiceToPdf } from '@/utils/exportInvoicePdf';
@@ -139,7 +139,47 @@ export const PathologyPartnersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const currentUser = useAppSelector(state => state.auth.user);
   const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'SUPER_ADMIN' || (currentUser as any)?.isSuperAdmin;
-  const userBranchId = (currentUser as any)?.branchId;
+  const userBranchId = (currentUser as any)?.branchId || (currentUser as any)?.adminUser?.branchId;
+
+  const { data: branchesData } = useBranchesQuery();
+  const [branches, setBranches] = useState<any[]>([]);
+  const [locationFilter, setLocationFilter] = useState<string>('ALL');
+  const [branchFilter, setBranchFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    if (branchesData) {
+      setBranches(branchesData);
+    }
+  }, [branchesData]);
+
+  const accessibleBranches = React.useMemo(() => {
+    if (!isSuperAdmin && userBranchId) {
+      return branches.filter((b: any) => b.id === userBranchId);
+    }
+    return branches;
+  }, [branches, isSuperAdmin, userBranchId]);
+
+  const uniqueLocations = React.useMemo(() => {
+    const locs = accessibleBranches
+      .map((b: any) => b.city)
+      .filter((c: any): c is string => Boolean(c && c.trim()));
+    return Array.from(new Set(locs)).sort((a: string, b: string) => a.localeCompare(b));
+  }, [accessibleBranches]);
+
+  const locationFilteredBranches = React.useMemo(() => {
+    if (locationFilter === 'ALL') return accessibleBranches;
+    return accessibleBranches.filter((b: any) => (b.city || '').toLowerCase() === locationFilter.toLowerCase());
+  }, [accessibleBranches, locationFilter]);
+
+  useEffect(() => {
+    if (!isSuperAdmin && userBranchId) {
+      setBranchFilter(userBranchId);
+      const myBranch = branches.find((b: any) => b.id === userBranchId);
+      if (myBranch?.city) {
+        setLocationFilter(myBranch.city);
+      }
+    }
+  }, [isSuperAdmin, userBranchId, branches]);
 
   const [activeView, setActiveView] = useState<'DIRECTORY' | 'PORTAL'>('DIRECTORY');
   const [partners, setPartners] = useState<Partner[]>([]);
@@ -550,11 +590,34 @@ export const PathologyPartnersPage: React.FC = () => {
   };
 
   const basePartners = React.useMemo(() => {
-    if (!isSuperAdmin && userBranchId) {
-      return partners.filter((p: any) => !p.branchId || p.branchId === userBranchId);
-    }
-    return partners;
-  }, [partners, isSuperAdmin, userBranchId]);
+    return partners.filter((p: any) => {
+      const partnerBranchId = p.branchId || p.user?.adminUser?.branchId;
+      const partnerBranch = branches.find((b: any) => b.id === partnerBranchId) || p.user?.adminUser?.branch;
+
+      if (!isSuperAdmin && userBranchId) {
+        if (partnerBranchId !== userBranchId && partnerBranch?.id !== userBranchId) {
+          return false;
+        }
+      }
+
+      // Location / City filter
+      if (locationFilter !== 'ALL') {
+        const branchCity = partnerBranch?.city || p.city;
+        if (!branchCity || branchCity.toLowerCase() !== locationFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Specific Branch filter
+      if (branchFilter !== 'ALL') {
+        if (partnerBranchId !== branchFilter && partnerBranch?.id !== branchFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [partners, branches, isSuperAdmin, userBranchId, locationFilter, branchFilter]);
 
   const filtered = basePartners.filter(p => {
     const typeInfo = getPartnerTypeInfo(p.role);
@@ -910,17 +973,59 @@ export const PathologyPartnersPage: React.FC = () => {
           </div>
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search by name, mobile, lab, or partner type..."
-                className="w-full pl-9 pr-4 py-2 rounded-md bg-card border border-input text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full pl-9 pr-4 py-2 rounded-lg bg-card border border-input text-xs sm:text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-foreground"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
+
+            {/* Location / City Filter */}
+            <div className="w-full sm:w-48">
+              <select
+                value={locationFilter}
+                onChange={e => {
+                  const newLoc = e.target.value;
+                  setLocationFilter(newLoc);
+                  if (newLoc !== 'ALL') {
+                    const isStillValid = locationFilteredBranches.some((b: any) => b.id === branchFilter && (b.city || '').toLowerCase() === newLoc.toLowerCase());
+                    if (!isStillValid) setBranchFilter('ALL');
+                  }
+                }}
+                className="w-full text-xs bg-card border border-input rounded-lg px-2.5 py-2 outline-none font-medium text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                {isSuperAdmin && <option value="ALL">All Locations / Cities</option>}
+                {uniqueLocations.map((loc: string) => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Branch Filter */}
+            <div className="w-full sm:w-56">
+              <select
+                value={branchFilter}
+                onChange={e => setBranchFilter(e.target.value)}
+                className="w-full text-xs bg-card border border-input rounded-lg px-2.5 py-2 outline-none font-medium text-foreground focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                {isSuperAdmin && (
+                  <option value="ALL">
+                    {locationFilter === 'ALL' ? 'All Branches / Partners' : `All ${locationFilter} Branches`}
+                  </option>
+                )}
+                {locationFilteredBranches.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex gap-2 flex-wrap">
               {['ALL', 'PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'].map(s => (
                 <button
@@ -1010,8 +1115,19 @@ export const PathologyPartnersPage: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-medium text-foreground">{partner.labName}</div>
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {partner.partnerCode || `PART-${partner.id.slice(0, 5).toUpperCase()}`}
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {partner.partnerCode || `PART-${partner.id.slice(0, 5).toUpperCase()}`}
+                            </span>
+                            {(() => {
+                              const partnerBranchId = (partner as any).branchId || (partner as any).user?.adminUser?.branchId;
+                              const matchedBranch = branches.find((b: any) => b.id === partnerBranchId) || (partner as any).user?.adminUser?.branch;
+                              return matchedBranch ? (
+                                <span className="text-[10px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
+                                  {matchedBranch.name}
+                                </span>
+                              ) : null;
+                            })()}
                           </div>
                         </td>
                         <td className="px-6 py-4">

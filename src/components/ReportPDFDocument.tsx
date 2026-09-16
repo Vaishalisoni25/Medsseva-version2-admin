@@ -90,14 +90,19 @@ export const ReportPDFDocument: React.FC<ReportPDFDocumentProps> = ({
     branch: rawBranch || rawBooking.branch || report.reportBranch || null,
   };
 
-  const doctor = rawDoctor || (report.doctorName ? {
-    name: report.doctorName,
-    qualification: report.doctorQualification || '',
-    regNo: report.doctorRegNo || '',
-    designation: report.doctorDesignation || '',
-    verifiedAt: report.doctorVerifiedAt || report.reportedDate || null,
-    signatureUrl: report.doctorSignatureUrl || report.signatureUrl || '',
-  } : undefined);
+  const doctor = rawDoctor
+    ? {
+        ...rawDoctor,
+        signatureUrl: rawDoctor.signatureUrl || report.doctorSignatureUrl || report.signatureUrl || '',
+      }
+    : (report.doctorName ? {
+        name: report.doctorName,
+        qualification: report.doctorQualification || '',
+        regNo: report.doctorRegNo || '',
+        designation: report.doctorDesignation || '',
+        verifiedAt: report.doctorVerifiedAt || report.reportedDate || null,
+        signatureUrl: report.doctorSignatureUrl || report.signatureUrl || '',
+      } : undefined);
 
   const fmt = (dt: string | null | undefined) =>
     dt ? new Date(dt).toLocaleString('en-IN', {

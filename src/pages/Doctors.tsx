@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '@/redux/hooks';
 import { useRolesQuery, useAllPermissionsQuery, useBranchesQuery } from '@/hooks/useAdminQueries';
@@ -10,7 +10,7 @@ import {
   Building2, CheckCircle2, Clock, XCircle, ShieldAlert,
   FileSignature, Eye, EyeOff, UserCheck,
   DollarSign, Activity, TrendingUp, FileText, RefreshCw,
-  Briefcase, CheckSquare, Square, ExternalLink
+  Briefcase, CheckSquare, Square, ExternalLink, Upload
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import toast from 'react-hot-toast';
@@ -99,6 +99,7 @@ export const DoctorsPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [portalSearch, setPortalSearch] = useState('');
   const [specFilter, setSpecFilter] = useState('ALL');
+  const [locationFilter, setLocationFilter] = useState('ALL');
   const [branchFilter, setBranchFilter] = useState('ALL');
   const [approvalFilter, setApprovalFilter] = useState<'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED' | 'SUSPENDED'>('ALL');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
@@ -130,8 +131,47 @@ export const DoctorsPage: React.FC = () => {
   const [formQualification, setFormQualification] = useState('');
   const [formRegistrationNo, setFormRegistrationNo] = useState('');
   const [formSignatureUrl, setFormSignatureUrl] = useState('');
+  const [signatureUploading, setSignatureUploading] = useState(false);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
   const [formCommissionRate, setFormCommissionRate] = useState<number>(30);
   const [formPaymentCycle, setFormPaymentCycle] = useState<string>('MONTHLY');
+
+  const handleSignatureFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset value so user can re-select same file if needed
+    e.target.value = '';
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!allowedTypes.includes(file.type) && !['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+      toast.error('Only JPG, JPEG, PNG, and WEBP image files are allowed.');
+      return;
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+    if (file.size > MAX_SIZE) {
+      toast.error('Signature file size must be less than 5 MB.');
+      return;
+    }
+
+    setSignatureUploading(true);
+    try {
+      const res = await doctorService.uploadSignature(file);
+      if (res?.url) {
+        setFormSignatureUrl(res.url);
+        toast.success('Signature uploaded successfully');
+      } else {
+        throw new Error('No signature URL returned from server');
+      }
+    } catch (err: any) {
+      console.error('Signature upload failed:', err);
+      toast.error(err.response?.data?.error || err.message || 'Failed to upload signature image.');
+    } finally {
+      setSignatureUploading(false);
+    }
+  };
 
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
   const [isCustomRole, setIsCustomRole] = useState(false);
@@ -475,6 +515,35 @@ export const DoctorsPage: React.FC = () => {
     }
   };
 
+  const accessibleBranches = useMemo(() => {
+    if (!isSuperAdmin && userBranchId) {
+      return branches.filter(b => b.id === userBranchId);
+    }
+    return branches;
+  }, [branches, isSuperAdmin, userBranchId]);
+
+  const uniqueLocations = useMemo(() => {
+    const locs = accessibleBranches
+      .map(b => b.city)
+      .filter((c): c is string => Boolean(c && c.trim()));
+    return Array.from(new Set(locs)).sort((a, b) => a.localeCompare(b));
+  }, [accessibleBranches]);
+
+  const locationFilteredBranches = useMemo(() => {
+    if (locationFilter === 'ALL') return accessibleBranches;
+    return accessibleBranches.filter(b => (b.city || '').toLowerCase() === locationFilter.toLowerCase());
+  }, [accessibleBranches, locationFilter]);
+
+  useEffect(() => {
+    if (!isSuperAdmin && userBranchId) {
+      setBranchFilter(userBranchId);
+      const myBranch = branches.find(b => b.id === userBranchId);
+      if (myBranch?.city) {
+        setLocationFilter(myBranch.city);
+      }
+    }
+  }, [isSuperAdmin, userBranchId, branches]);
+
   const baseDoctors = useMemo(() => {
     if (!isSuperAdmin && userBranchId) {
       return doctors.filter(d => d.branchId === userBranchId || d.branch?.id === userBranchId);
@@ -489,7 +558,18 @@ export const DoctorsPage: React.FC = () => {
       if (activeFilter === 'ACTIVE' && !d.isActive) return false;
       if (activeFilter === 'INACTIVE' && d.isActive) return false;
       if (specFilter !== 'ALL' && d.specialization !== specFilter) return false;
-      if (branchFilter !== 'ALL' && d.branchId !== branchFilter) return false;
+
+      // Location / City filter
+      if (locationFilter !== 'ALL') {
+        const docBranch = branches.find(b => b.id === d.branchId || b.id === d.branch?.id) || d.branch;
+        if (!docBranch || (docBranch.city || '').toLowerCase() !== locationFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Specific Branch filter
+      if (branchFilter !== 'ALL' && d.branchId !== branchFilter && d.branch?.id !== branchFilter) return false;
+
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
@@ -501,7 +581,7 @@ export const DoctorsPage: React.FC = () => {
       }
       return true;
     });
-  }, [baseDoctors, approvalFilter, activeFilter, specFilter, branchFilter, search]);
+  }, [baseDoctors, branches, approvalFilter, activeFilter, specFilter, locationFilter, branchFilter, search]);
 
   const filteredReferrals = useMemo(() => {
     if (!portalData?.referrals) return [];
@@ -860,13 +940,37 @@ export const DoctorsPage: React.FC = () => {
                 ))}
               </select>
 
+              {/* Location / City Filter */}
+              <select
+                value={locationFilter}
+                onChange={e => {
+                  const newLoc = e.target.value;
+                  setLocationFilter(newLoc);
+                  if (newLoc !== 'ALL') {
+                    const isStillValid = locationFilteredBranches.some(b => b.id === branchFilter && (b.city || '').toLowerCase() === newLoc.toLowerCase());
+                    if (!isStillValid) setBranchFilter('ALL');
+                  }
+                }}
+                className="text-xs bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none font-medium text-foreground"
+              >
+                {isSuperAdmin && <option value="ALL">All Locations / Cities</option>}
+                {uniqueLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+
+              {/* Branch Filter */}
               <select
                 value={branchFilter}
                 onChange={e => setBranchFilter(e.target.value)}
                 className="text-xs bg-background border border-border rounded-lg px-2.5 py-1.5 outline-none font-medium text-foreground"
               >
-                <option value="ALL">All Branches / Partners</option>
-                {branches.map(b => (
+                {isSuperAdmin && (
+                  <option value="ALL">
+                    {locationFilter === 'ALL' ? 'All Branches / Partners' : `All ${locationFilter} Branches`}
+                  </option>
+                )}
+                {locationFilteredBranches.map(b => (
                   <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
                 ))}
               </select>
@@ -1212,16 +1316,104 @@ export const DoctorsPage: React.FC = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-semibold text-foreground mb-1 block">Doctor Signature Image URL (Optional)</label>
+                    <div className="md:col-span-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <FileSignature className="h-4 w-4 text-teal-600" />
+                          Doctor Signature (Upload / URL)
+                        </label>
+                        {formSignatureUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setFormSignatureUrl('')}
+                            className="text-[11px] text-rose-500 hover:text-rose-600 font-medium flex items-center gap-1"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove Signature
+                          </button>
+                        )}
+                      </div>
+
                       <input
-                        type="text"
-                        value={formSignatureUrl}
-                        onChange={e => setFormSignatureUrl(e.target.value)}
-                        placeholder="e.g. https://res.cloudinary.com/.../signature.png"
-                        className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30"
+                        type="file"
+                        ref={signatureInputRef}
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleSignatureFileSelect}
+                        className="hidden"
                       />
-                      <p className="text-[10px] text-muted-foreground mt-1">If blank, standard digital signature stamp will be used on reports.</p>
+
+                      {formSignatureUrl ? (
+                        <div className="p-3 bg-muted/40 border border-border rounded-xl flex flex-col sm:flex-row items-center gap-4">
+                          <div className="bg-white border border-slate-200 rounded-lg p-2 min-w-[140px] max-w-[200px] h-20 flex items-center justify-center shadow-xs">
+                            <img
+                              src={formSignatureUrl}
+                              alt="Doctor Signature Preview"
+                              className="max-h-16 max-w-full object-contain"
+                              crossOrigin="anonymous"
+                            />
+                          </div>
+                          <div className="flex-1 text-center sm:text-left space-y-1">
+                            <div className="text-xs font-bold text-emerald-600 flex items-center gap-1 justify-center sm:justify-start">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Signature Attached & Active
+                            </div>
+                            <p className="text-[11px] text-muted-foreground truncate max-w-xs">{formSignatureUrl}</p>
+                            <div className="flex items-center gap-2 justify-center sm:justify-start pt-1">
+                              <button
+                                type="button"
+                                disabled={signatureUploading}
+                                onClick={() => signatureInputRef.current?.click()}
+                                className="px-2.5 py-1 text-xs font-semibold bg-background border border-border hover:bg-muted rounded-lg flex items-center gap-1 transition-colors"
+                              >
+                                {signatureUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3 text-teal-600" />}
+                                Replace Signature
+                              </button>
+                              <a
+                                href={formSignatureUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                              >
+                                <ExternalLink className="h-3 w-3" /> View Full
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => !signatureUploading && signatureInputRef.current?.click()}
+                          className={cn(
+                            "border-2 border-dashed border-border hover:border-teal-500/60 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40",
+                            signatureUploading && "opacity-60 cursor-not-allowed"
+                          )}
+                        >
+                          {signatureUploading ? (
+                            <div className="flex flex-col items-center gap-2 py-2">
+                              <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+                              <span className="text-xs font-semibold text-muted-foreground">Uploading signature image...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1 py-1">
+                              <div className="h-9 w-9 rounded-full bg-teal-500/10 text-teal-600 flex items-center justify-center mb-1">
+                                <Upload className="h-4 w-4" />
+                              </div>
+                              <span className="text-xs font-bold text-foreground">Click to upload doctor signature</span>
+                              <span className="text-[11px] text-muted-foreground">Upload from Files / Gallery (PNG, JPG, WEBP • Max 5MB)</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="pt-1">
+                        <input
+                          type="text"
+                          value={formSignatureUrl}
+                          onChange={e => setFormSignatureUrl(e.target.value)}
+                          placeholder="Or paste direct image URL (e.g. https://res.cloudinary.com/.../signature.png)"
+                          className="w-full h-8 px-3 bg-background border border-border/70 rounded-lg text-xs outline-none focus:ring-1 focus:ring-teal-500/30 text-muted-foreground"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        This signature image will appear on generated diagnostic reports in place of the generic digital signature stamp. If blank, standard digital signature stamp will be used.
+                      </p>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-foreground mb-1 block">Commission Rate (%) *</label>

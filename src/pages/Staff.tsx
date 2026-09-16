@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { staffService } from '@/services/api';
 import { branchService, Branch } from '@/services/branch.service';
 import { useAppSelector } from '@/redux/hooks';
@@ -6,7 +6,8 @@ import { AdminRole } from '@/types/rbac';
 import {
   Briefcase, Plus, Pencil, Trash2, Search, X, Loader2,
   Building2, CheckCircle2, ShieldCheck, Mail, Phone,
-  Users, UserCheck, ToggleLeft, ToggleRight, Eye, EyeOff
+  Users, UserCheck, ToggleLeft, ToggleRight, Eye, EyeOff,
+  FileSignature, Upload, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ export interface StaffRecord {
   isActive: boolean;
   department?: string;
   designation?: string;
+  signatureUrl?: string;
   franchiseId?: string;
   branchId?: string;
   userType?: string;
@@ -93,6 +95,46 @@ export const StaffPage: React.FC = () => {
   const [customDesignation, setCustomDesignation] = useState('');
   const [formBranchId, setFormBranchId] = useState('');
   const [formFranchiseId, setFormFranchiseId] = useState('');
+  const [formSignatureUrl, setFormSignatureUrl] = useState('');
+  const [signatureUploading, setSignatureUploading] = useState(false);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSignatureFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset value so user can re-select same file if needed
+    e.target.value = '';
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!allowedTypes.includes(file.type) && !['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+      toast.error('Only JPG, JPEG, PNG, and WEBP image files are allowed.');
+      return;
+    }
+
+    const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+    if (file.size > MAX_SIZE) {
+      toast.error('Signature file size must be less than 5 MB.');
+      return;
+    }
+
+    setSignatureUploading(true);
+    try {
+      const res = await staffService.uploadSignature(file);
+      if (res?.url) {
+        setFormSignatureUrl(res.url);
+        toast.success('Signature uploaded successfully');
+      } else {
+        throw new Error('No signature URL returned from server');
+      }
+    } catch (err: any) {
+      console.error('Signature upload failed:', err);
+      toast.error(err.response?.data?.error || err.message || 'Failed to upload signature image.');
+    } finally {
+      setSignatureUploading(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -133,6 +175,7 @@ export const StaffPage: React.FC = () => {
     const userBranch = userBranchId || (currentUser as any)?.branchId || (branches[0]?.id || '');
     setFormBranchId(userBranch || '');
     setFormFranchiseId('');
+    setFormSignatureUrl('');
     setModalOpen(true);
   };
 
@@ -164,6 +207,7 @@ export const StaffPage: React.FC = () => {
 
     setFormBranchId(s.branchId || (s as any).branch?.id || '');
     setFormFranchiseId(s.franchiseId || '');
+    setFormSignatureUrl(s.signatureUrl || (s as any).adminUser?.signatureUrl || '');
     setModalOpen(true);
   };
 
@@ -190,6 +234,10 @@ export const StaffPage: React.FC = () => {
     }
 
     const targetBranchId = formBranchId || userBranchId || undefined;
+    const isLabTech = finalDesignation === 'Lab Technician' ||
+      finalDesignation === 'Senior Lab Technician' ||
+      finalDesignation.toLowerCase().includes('technician') ||
+      finalDesignation.toLowerCase().includes('technologist');
 
     const payload: any = {
       name: formName.trim(),
@@ -200,6 +248,7 @@ export const StaffPage: React.FC = () => {
       designation: finalDesignation || undefined,
       branchId: targetBranchId,
       franchiseId: formFranchiseId || undefined,
+      signatureUrl: isLabTech ? (formSignatureUrl || null) : undefined,
     };
 
     if (formPassword.trim()) {
@@ -405,8 +454,13 @@ export const StaffPage: React.FC = () => {
                       </div>
                       <div>
                         <div className="font-semibold text-foreground">{s.user.name}</div>
-                        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                          {s.designation || 'Lab Staff'}
+                        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
+                          <span>{s.designation || 'Lab Staff'}</span>
+                          {s.signatureUrl && (
+                            <span title="Digital Signature Uploaded">
+                              <FileSignature className="w-3.5 h-3.5 text-emerald-600 inline-block shrink-0" />
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -657,6 +711,117 @@ export const StaffPage: React.FC = () => {
                       ))}
                   </select>
                 </div>
+
+                {/* Lab Technician Signature Upload (Only when Role / Designation is Lab Technician) */}
+                {(() => {
+                  const currentDesignation = formDesignation === 'Others' ? customDesignation.trim() : formDesignation;
+                  const isLabTech = currentDesignation === 'Lab Technician' ||
+                    currentDesignation === 'Senior Lab Technician' ||
+                    currentDesignation.toLowerCase().includes('technician') ||
+                    currentDesignation.toLowerCase().includes('technologist');
+
+                  if (!isLabTech) return null;
+
+                  return (
+                    <div className="md:col-span-2 space-y-2 pt-2 border-t border-border/60">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <FileSignature className="h-4 w-4 text-indigo-600" />
+                          Lab Technician Signature (Optional)
+                        </label>
+                        {formSignatureUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setFormSignatureUrl('')}
+                            className="text-[11px] text-rose-500 hover:text-rose-600 font-medium flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove Signature
+                          </button>
+                        )}
+                      </div>
+
+                      <input
+                        type="file"
+                        ref={signatureInputRef}
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleSignatureFileSelect}
+                        className="hidden"
+                      />
+
+                      {formSignatureUrl ? (
+                        <div className="p-3 bg-muted/40 border border-border rounded-xl flex flex-col sm:flex-row items-center gap-4">
+                          <div className="bg-white border border-slate-200 rounded-lg p-2 min-w-[140px] max-w-[200px] h-20 flex items-center justify-center shadow-xs">
+                            <img
+                              src={formSignatureUrl}
+                              alt="Lab Technician Signature Preview"
+                              className="max-h-16 max-w-full object-contain"
+                              crossOrigin="anonymous"
+                            />
+                          </div>
+                          <div className="flex-1 text-center sm:text-left space-y-1">
+                            <div className="text-xs font-bold text-emerald-600 flex items-center gap-1 justify-center sm:justify-start">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Signature Attached & Active
+                            </div>
+                            <p className="text-[11px] text-muted-foreground truncate max-w-xs">{formSignatureUrl}</p>
+                            <div className="flex items-center gap-2 justify-center sm:justify-start pt-1">
+                              <button
+                                type="button"
+                                disabled={signatureUploading}
+                                onClick={() => signatureInputRef.current?.click()}
+                                className="px-2.5 py-1 text-xs font-semibold bg-background border border-border hover:bg-muted rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                {signatureUploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3 text-indigo-600" />}
+                                Replace Signature
+                              </button>
+                              <a
+                                href={formSignatureUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                              >
+                                <ExternalLink className="h-3 w-3" /> View Full
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => !signatureUploading && signatureInputRef.current?.click()}
+                          className={cn(
+                            "border-2 border-dashed border-border hover:border-indigo-500/60 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-muted/20 hover:bg-muted/40",
+                            signatureUploading && "opacity-60 cursor-not-allowed"
+                          )}
+                        >
+                          {signatureUploading ? (
+                            <div className="flex flex-col items-center gap-2 py-2">
+                              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                              <span className="text-xs font-semibold text-muted-foreground">Uploading signature image...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1 py-1">
+                              <div className="h-9 w-9 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center mb-1">
+                                <Upload className="h-4 w-4" />
+                              </div>
+                              <span className="text-xs font-bold text-foreground">Click to upload lab technician signature</span>
+                              <span className="text-[11px] text-muted-foreground">Upload from Files / Gallery (PNG, JPG, WEBP • Max 5MB)</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="pt-1">
+                        <input
+                          type="text"
+                          value={formSignatureUrl}
+                          onChange={e => setFormSignatureUrl(e.target.value)}
+                          placeholder="Or paste direct image URL (e.g. https://res.cloudinary.com/.../signature.png)"
+                          className="w-full h-8 px-3 bg-background border border-border rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500/30 text-muted-foreground focus:text-foreground"
+                        />
+                        <p className="text-[10px] text-muted-foreground mt-1">Optional field. Can be uploaded now or added/updated later.</p>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

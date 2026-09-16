@@ -78,8 +78,8 @@ export const useSampleQueueQuery = () => useQuery({ queryKey: ['sampleQueue'], q
 export const useUsersQuery = () => useQuery({ queryKey: ['users'], queryFn: () => testService.getRegisteredUsers(), ...BASE_OPTS });
 export const usePatientsQuery = (params?: { branchId?: string; search?: string }) =>
   useQuery({ queryKey: ['patients', params], queryFn: () => patientService.getPatients(params), ...BASE_OPTS, refetchOnMount: 'always' });
-export function usePartnersQuery(status?: string) {
-  return useQuery({ queryKey: ['partners', status], queryFn: () => testService.getPartners(status), ...BASE_OPTS, refetchOnMount: 'always', staleTime: 0 });
+export function usePartnersQuery(params?: { status?: string; branchId?: string } | string) {
+  return useQuery({ queryKey: ['partners', params], queryFn: () => testService.getPartners(params), ...BASE_OPTS, refetchOnMount: 'always', staleTime: 0 });
 }
 export function useAnalyticsDashboardQuery(params?: Record<string, string>) {
   return useQuery({ queryKey: ['analyticsDashboard', params], queryFn: () => analyticsService.getDashboard(params), ...BASE_OPTS });

@@ -89,6 +89,13 @@ export const doctorService = {
   createDoctor: (data: any) => api.post('/doctors', data).then(r => r.data),
   updateDoctor: (id: string, data: any) => api.put(`/doctors/${id}`, data).then(r => r.data),
   deleteDoctor: (id: string) => api.delete(`/doctors/${id}`).then(r => r.data),
+  uploadSignature: (file: File) => {
+    const form = new FormData();
+    form.append('signature', file);
+    return api.post('/doctors/upload-signature', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
 };
 
 export const staffService = {
@@ -98,6 +105,7 @@ export const staffService = {
   createStaff: (data: any) => api.post('/staff', data).then(r => r.data),
   updateStaff: (id: string, data: any) => api.put(`/staff/${id}`, data).then(r => r.data),
   deleteStaff: (id: string) => api.delete(`/staff/${id}`).then(r => r.data),
+  uploadSignature: (file: File) => doctorService.uploadSignature(file),
 };
 
 export const rbacService = {
@@ -247,8 +255,17 @@ rejectLabBooking: async (id: string, reason: string) => {
     const response = await api.get('/auth/partners/available', { params });
     return response.data;
   },
-  getPartners: async (status?: string) => {
-    const url = status ? `/auth/partners?status=${status}` : '/auth/partners';
+  getPartners: async (statusOrParams?: string | { status?: string; branchId?: string }) => {
+    let url = '/auth/partners';
+    if (typeof statusOrParams === 'string') {
+      url = statusOrParams ? `/auth/partners?status=${statusOrParams}` : '/auth/partners';
+    } else if (statusOrParams) {
+      const q = new URLSearchParams();
+      if (statusOrParams.status && statusOrParams.status !== 'ALL') q.append('status', statusOrParams.status);
+      if (statusOrParams.branchId && statusOrParams.branchId !== 'ALL' && statusOrParams.branchId !== 'all') q.append('branchId', statusOrParams.branchId);
+      const qs = q.toString();
+      url = qs ? `/auth/partners?${qs}` : '/auth/partners';
+    }
     const response = await api.get(url);
     return response.data;
   },

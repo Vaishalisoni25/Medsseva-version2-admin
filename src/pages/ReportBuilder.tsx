@@ -86,6 +86,7 @@ type VerificationDetails = {
   doctorRegNo: string;
   doctorDesignation: string;
   doctorVerifiedAt: string;
+  doctorSignatureUrl?: string;
 };
 
 const computeFlag = (value: string, param: ParameterEntry): Flag => {
@@ -258,6 +259,7 @@ const emptyVerification = (): VerificationDetails => ({
   doctorRegNo: '',
   doctorDesignation: '',
   doctorVerifiedAt: new Date().toISOString(),
+  doctorSignatureUrl: '',
 });
 
 export const ReportBuilderPage: React.FC = () => {
@@ -307,6 +309,23 @@ export const ReportBuilderPage: React.FC = () => {
   const [creatingWalkin, setCreatingWalkin] = useState(false);
   const [editingParam, setEditingParam] = useState<{ groupIdx: number; paramIdx: number } | null>(null);
 
+  const currentReport = useMemo(() => {
+    return reports.find((r: any) => r.bookingId === selectedBooking?.id) || selectedBooking?.report;
+  }, [reports, selectedBooking]);
+
+  const isReportCreated = Boolean(
+    currentReport && (
+      currentReport.id ||
+      currentReport.status === 'GENERATED' ||
+      currentReport.status === 'FINAL' ||
+      currentReport.status === 'VERIFIED' ||
+      currentReport.status === 'PUBLISHED' ||
+      currentReport.pdfUrl ||
+      selectedBooking?.status === 'COMPLETED' ||
+      selectedBooking?.status === 'REPORT_GENERATED'
+    )
+  );
+
   useReportsQuery();
   useBookingsForReportQuery();
 
@@ -319,12 +338,6 @@ export const ReportBuilderPage: React.FC = () => {
         } else if (res.data.length > 0) {
           setVerification(v => ({ ...v, reportBranchId: v.reportBranchId || res.data[0].id }));
         }
-      }
-    }).catch(() => {});
-
-    doctorService.getDoctors().then(docs => {
-      if (docs?.data && Array.isArray(docs.data)) {
-        setAvailableDoctors(docs.data);
       }
     }).catch(() => {});
 
@@ -443,6 +456,48 @@ export const ReportBuilderPage: React.FC = () => {
     }
   }, [verification.reportBranchId, branches]);
 
+  useEffect(() => {
+    const branchId = verification.reportBranchId;
+    if (!branchId) {
+      setAvailableDoctors([]);
+      setSelectedDoctorId('');
+      return;
+    }
+
+    doctorService.getDoctors({ branchId }).then(res => {
+      const docs = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
+      const branchDocs = docs.filter((d: any) => d.branchId === branchId || d.branch?.id === branchId);
+      setAvailableDoctors(branchDocs);
+
+      if (isReportCreated) return;
+
+      if (branchDocs.length > 0) {
+        const matchedDoc = branchDocs.find((d: any) => d.id === selectedDoctorId) || branchDocs[0];
+        setSelectedDoctorId(matchedDoc.id);
+        setVerification(v => ({
+          ...v,
+          doctorName: matchedDoc.name,
+          doctorQualification: matchedDoc.qualification || '',
+          doctorRegNo: matchedDoc.registrationNo || '',
+          doctorDesignation: matchedDoc.designation || 'Senior Pathologist',
+          doctorSignatureUrl: matchedDoc.signatureUrl || '',
+        }));
+      } else {
+        setSelectedDoctorId('');
+        setVerification(v => ({
+          ...v,
+          doctorName: '',
+          doctorQualification: '',
+          doctorRegNo: '',
+          doctorDesignation: '',
+          doctorSignatureUrl: '',
+        }));
+      }
+    }).catch(err => {
+      console.error('Failed to load branch doctors:', err);
+    });
+  }, [verification.reportBranchId, isReportCreated]);
+
   const handleSelectBooking = useCallback((booking: any) => {
     setSelectedBooking(booking);
     setShowModal(false);
@@ -479,6 +534,7 @@ export const ReportBuilderPage: React.FC = () => {
         doctorRegNo: existingReport.doctorRegNo || '',
         doctorDesignation: existingReport.doctorDesignation || '',
         doctorVerifiedAt: existingReport.doctorVerifiedAt || new Date().toISOString(),
+        doctorSignatureUrl: existingReport.doctorSignatureUrl || (existingReport as any).signatureUrl || '',
       });
     } else {
       setReportTemplate('STANDARD');
@@ -610,6 +666,7 @@ export const ReportBuilderPage: React.FC = () => {
       doctorRegNo: verification.doctorRegNo || null,
       doctorDesignation: verification.doctorDesignation || null,
       doctorVerifiedAt: verification.doctorVerifiedAt || null,
+      doctorSignatureUrl: verification.doctorSignatureUrl || null,
     };
   };
 
@@ -1501,19 +1558,29 @@ const filteredBookings = useMemo(() => {
                                       doctorDesignation: doc.designation || 'Senior Pathologist',
                                       doctorSignatureUrl: doc.signatureUrl || '',
                                     }));
+                                  } else {
+                                    setVerification(v => ({
+                                      ...v,
+                                      doctorName: '',
+                                      doctorQualification: '',
+                                      doctorRegNo: '',
+                                      doctorDesignation: '',
+                                      doctorSignatureUrl: '',
+                                    }));
                                   }
                                 }}
                                 className="w-full text-xs font-semibold bg-background border border-primary/30 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                               >
-                                <option value="">-- Choose Registered Doctor (Auto-fill) --</option>
-                                {availableDoctors.map(d => {
-                                  const isMatchBranch = verification.reportBranchId && d.branchId === verification.reportBranchId;
-                                  return (
-                                    <option key={d.id} value={d.id}>
-                                      {d.name} ({d.qualification || 'MBBS'} - Reg: {d.registrationNo}) {isMatchBranch ? '📍 [Nearby / Branch Doctor]' : (d.branch?.name ? `[${d.branch.name}]` : '')}
-                                    </option>
-                                  );
-                                })}
+                                <option value="">
+                                  {availableDoctors.length === 0
+                                    ? (verification.reportBranchId ? '-- No Doctors Found for this Branch --' : '-- Select Branch First --')
+                                    : '-- Choose Registered Doctor (Auto-fill) --'}
+                                </option>
+                                {availableDoctors.map(d => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.name} ({d.qualification || 'MBBS'} - Reg: {d.registrationNo})
+                                  </option>
+                                ))}
                               </select>
                             </div>
                           )}
@@ -1602,6 +1669,40 @@ const filteredBookings = useMemo(() => {
                                     : "border-input focus:border-primary bg-card"
                                 )}
                               />
+                            </div>
+
+                            <div className="md:col-span-2 pt-1 border-t border-border/50">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] font-bold text-muted-foreground">Doctor Signature</span>
+                                {verification.doctorSignatureUrl ? (
+                                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                    <Check className="h-3 w-3" /> Uploaded Signature Ready
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                                    Using Digital Stamp Fallback
+                                  </span>
+                                )}
+                              </div>
+                              {verification.doctorSignatureUrl ? (
+                                <div className="flex items-center gap-3 p-2 bg-muted/40 rounded-lg border border-border">
+                                  <div className="h-10 px-3 py-1 bg-white rounded border border-border flex items-center justify-center shadow-xs">
+                                    <img
+                                      src={verification.doctorSignatureUrl}
+                                      alt="Doctor Signature"
+                                      className="max-h-8 max-w-[120px] object-contain"
+                                      crossOrigin="anonymous"
+                                    />
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    Actual uploaded signature will be displayed on the final test report.
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-muted-foreground bg-muted/30 p-2 rounded-lg border border-dashed border-border">
+                                  No signature uploaded for this doctor. The standard "DIGITALLY SIGNED" stamp will be displayed. You can upload their signature anytime in Doctor Management.
+                                </div>
+                              )}
                             </div>
                           </div>
                         </>
