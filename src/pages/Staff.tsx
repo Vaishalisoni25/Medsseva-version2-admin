@@ -81,6 +81,7 @@ export const StaffPage: React.FC = () => {
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<StaffRecord | null>(null);
+  const [viewingStaff, setViewingStaff] = useState<StaffRecord | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form State
@@ -238,6 +239,11 @@ export const StaffPage: React.FC = () => {
       finalDesignation === 'Senior Lab Technician' ||
       finalDesignation.toLowerCase().includes('technician') ||
       finalDesignation.toLowerCase().includes('technologist');
+
+    if (isLabTech && !formSignatureUrl?.trim()) {
+      toast.error('Signature is required for Lab Technician');
+      return;
+    }
 
     const payload: any = {
       name: formName.trim(),
@@ -448,12 +454,16 @@ export const StaffPage: React.FC = () => {
                 <tr key={s.id} className="hover:bg-muted/20 transition-colors">
                   {/* Staff Info */}
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs border border-indigo-200">
+                    <div
+                      onClick={() => setViewingStaff(s)}
+                      className="flex items-center gap-3 cursor-pointer group"
+                      title="Click to view employee details"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs border border-indigo-200 group-hover:scale-105 transition-transform">
                         {s.user.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div className="font-semibold text-foreground">{s.user.name}</div>
+                        <div className="font-semibold text-foreground group-hover:text-indigo-600 transition-colors">{s.user.name}</div>
                         <div className="text-xs text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
                           <span>{s.designation || 'Lab Staff'}</span>
                           {s.signatureUrl && (
@@ -521,17 +531,24 @@ export const StaffPage: React.FC = () => {
 
                   {/* Actions */}
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => setViewingStaff(s)}
+                        className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-muted-foreground hover:text-indigo-600 transition-colors cursor-pointer"
+                        title="View Details"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => openEdit(s)}
-                        className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         title="Edit Employee"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(s)}
-                        className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                         title="Delete Employee"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -727,7 +744,7 @@ export const StaffPage: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                           <FileSignature className="h-4 w-4 text-indigo-600" />
-                          Lab Technician Signature (Optional)
+                          Lab Technician Signature <span className="text-rose-500 font-bold">*</span>
                         </label>
                         {formSignatureUrl && (
                           <button
@@ -817,7 +834,7 @@ export const StaffPage: React.FC = () => {
                           placeholder="Or paste direct image URL (e.g. https://res.cloudinary.com/.../signature.png)"
                           className="w-full h-8 px-3 bg-background border border-border rounded-lg text-xs outline-none focus:ring-1 focus:ring-indigo-500/30 text-muted-foreground focus:text-foreground"
                         />
-                        <p className="text-[10px] text-muted-foreground mt-1">Optional field. Can be uploaded now or added/updated later.</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Required for Lab Technicians. Will be displayed on patient test reports.</p>
                       </div>
                     </div>
                   );
@@ -839,6 +856,165 @@ export const StaffPage: React.FC = () => {
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editing ? 'Save Changes' : 'Save Employee'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Staff / Employee Details Modal */}
+      {viewingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-border bg-gradient-to-r from-indigo-500/10 via-indigo-500/5 to-transparent flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-md shadow-indigo-600/20">
+                  {viewingStaff.user.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-foreground">{viewingStaff.user.name}</h2>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      viewingStaff.isActive
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
+                    }`}>
+                      {viewingStaff.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">{viewingStaff.designation || 'Staff'}</span>
+                    <span>•</span>
+                    <span>{viewingStaff.department || 'Operations'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingStaff(null)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Contact Details Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                  Contact & Profile Information
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Email Address</span>
+                    <span className="font-semibold text-foreground break-all">{viewingStaff.user.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Mobile Number</span>
+                    <span className="font-semibold text-foreground">{viewingStaff.user.mobile || 'Not provided'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Access Role</span>
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      {viewingStaff.role?.name || 'Standard Staff'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">User Type</span>
+                    <span className="font-semibold text-foreground">{viewingStaff.userType || 'EMPLOYEE'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Department & Branch Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                  Department & Location
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Department</span>
+                    <span className="font-semibold text-foreground">{viewingStaff.department || 'Operations'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Designation</span>
+                    <span className="font-semibold text-foreground">{viewingStaff.designation || 'Staff'}</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-[11px] text-muted-foreground block">Assigned Branch</span>
+                    <span className="font-semibold text-foreground">
+                      {viewingStaff.branch?.name ? `${viewingStaff.branch.name} (${viewingStaff.branch.city || ''})` : 'All Branches / Central Lab'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Digital Signature Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <FileSignature className="w-3.5 h-3.5 text-indigo-600" />
+                    Digital Signature
+                  </h3>
+                  {viewingStaff.signatureUrl ? (
+                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3" /> Attached & Verified
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">Not uploaded</span>
+                  )}
+                </div>
+
+                {viewingStaff.signatureUrl ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-card border border-border rounded-xl">
+                    <div className="bg-white border border-slate-200 rounded-lg p-2 min-w-[140px] max-w-[200px] h-20 flex items-center justify-center shadow-xs">
+                      <img
+                        src={viewingStaff.signatureUrl}
+                        alt="Staff Signature Preview"
+                        className="max-h-16 max-w-full object-contain"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-1">
+                      <p className="text-xs font-semibold text-foreground">Official Staff Signature</p>
+                      <p className="text-[11px] text-muted-foreground">Applied to patient lab reports & sample authorizations</p>
+                      <a
+                        href={viewingStaff.signatureUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline pt-1 font-semibold"
+                      >
+                        <ExternalLink className="w-3 h-3" /> View Full Signature Image
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">No signature uploaded for this employee.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-6 border-t border-border flex items-center justify-end gap-3 flex-shrink-0 bg-card">
+              <button
+                onClick={() => setViewingStaff(null)}
+                className="px-4 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const s = viewingStaff;
+                  setViewingStaff(null);
+                  openEdit(s);
+                }}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-600/20 cursor-pointer"
+              >
+                <Pencil className="w-4 h-4" /> Edit Details
               </button>
             </div>
           </div>

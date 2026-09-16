@@ -113,6 +113,7 @@ export const DoctorsPage: React.FC = () => {
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<DoctorRecord | null>(null);
+  const [viewingDoctor, setViewingDoctor] = useState<DoctorRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewSignature, setPreviewSignature] = useState<DoctorRecord | null>(null);
 
@@ -1013,8 +1014,12 @@ export const DoctorsPage: React.FC = () => {
                   {filteredDoctors.map(d => (
                     <tr key={d.id} className="hover:bg-muted/20 transition-colors">
                       <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-500/20 text-teal-700 dark:text-teal-300 font-bold flex items-center justify-center text-xs flex-shrink-0 overflow-hidden">
+                        <div
+                          onClick={() => setViewingDoctor(d)}
+                          className="flex items-center gap-3 cursor-pointer group"
+                          title="Click to view doctor details"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-500/20 text-teal-700 dark:text-teal-300 font-bold flex items-center justify-center text-xs flex-shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
                             {d.photoUrl ? (
                               <img src={d.photoUrl} alt={d.name} className="w-full h-full object-cover" />
                             ) : (
@@ -1022,7 +1027,7 @@ export const DoctorsPage: React.FC = () => {
                             )}
                           </div>
                           <div>
-                            <div className="font-bold text-foreground text-sm">Dr. {d.name}</div>
+                            <div className="font-bold text-foreground text-sm group-hover:text-teal-600 transition-colors">Dr. {d.name}</div>
                             <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                               <span className="font-mono text-teal-600 dark:text-teal-400 font-semibold">{d.registrationNo}</span>
                               <span>•</span>
@@ -1152,6 +1157,13 @@ export const DoctorsPage: React.FC = () => {
 
                       <td className="py-3.5 px-5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setViewingDoctor(d)}
+                            className="p-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950/50 text-muted-foreground hover:text-teal-600 transition-colors cursor-pointer"
+                            title="View Doctor Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => openEdit(d)}
                             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
@@ -1650,6 +1662,208 @@ export const DoctorsPage: React.FC = () => {
             >
               Close Preview
             </button>
+          </div>
+        </div>
+      )}
+      {/* View Doctor Details Modal */}
+      {viewingDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-border bg-gradient-to-r from-teal-500/10 via-teal-500/5 to-transparent flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center font-bold text-base shadow-md shadow-teal-600/20 overflow-hidden">
+                  {viewingDoctor.photoUrl ? (
+                    <img src={viewingDoctor.photoUrl} alt={viewingDoctor.name} className="w-full h-full object-cover" />
+                  ) : (
+                    `Dr.`
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-foreground">Dr. {viewingDoctor.name}</h2>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      viewingDoctor.approvalStatus === 'APPROVED'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        : viewingDoctor.approvalStatus === 'PENDING'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
+                    }`}>
+                      {viewingDoctor.approvalStatus || 'APPROVED'}
+                    </span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      viewingDoctor.isActive
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200'
+                        : 'bg-muted text-muted-foreground border border-border'
+                    }`}>
+                      {viewingDoctor.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                    <span className="font-semibold text-teal-600 dark:text-teal-400">{viewingDoctor.specialization || 'General / Pathology'}</span>
+                    <span>•</span>
+                    <span>{viewingDoctor.qualification || 'MBBS'}</span>
+                    <span>•</span>
+                    <span className="font-mono">{viewingDoctor.registrationNo || 'No Reg'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingDoctor(null)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Professional Credentials Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Stethoscope className="w-3.5 h-3.5 text-teal-600" />
+                  Medical & Professional Credentials
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Medical Registration (MCI)</span>
+                    <span className="font-semibold text-foreground font-mono">{viewingDoctor.registrationNo || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Qualifications</span>
+                    <span className="font-semibold text-foreground">{viewingDoctor.qualification || 'MBBS'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Specialization</span>
+                    <span className="font-semibold text-teal-600 dark:text-teal-400">{viewingDoctor.specialization || 'Pathology'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Designation / Role</span>
+                    <span className="font-semibold text-foreground">{viewingDoctor.designation || 'Consultant Doctor'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact & Location Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                  Contact Info & Assigned Branch
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Email Address</span>
+                    <span className="font-semibold text-foreground break-all">{viewingDoctor.user?.email || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Mobile Number</span>
+                    <span className="font-semibold text-foreground">{viewingDoctor.user?.mobile || 'Not provided'}</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-[11px] text-muted-foreground block">Assigned Branch / Location</span>
+                    <span className="font-semibold text-foreground">
+                      {viewingDoctor.branch?.name ? `${viewingDoctor.branch.name} (${viewingDoctor.branch.city || ''})` : 'All Branches / Central Lab'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Commission & Commercials Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-teal-600" />
+                  Commercials & Commission
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Test Referral Commission</span>
+                    <span className="font-bold text-emerald-600 text-sm">{viewingDoctor.commissionRate ?? 30}%</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground block">Payment Cycle</span>
+                    <span className="font-semibold text-foreground">{viewingDoctor.paymentCycle || 'MONTHLY'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Digital Signature & Stamp Card */}
+              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <FileSignature className="w-3.5 h-3.5 text-teal-600" />
+                    Doctor Digital Signature & Stamp
+                  </h3>
+                  {viewingDoctor.signatureUrl ? (
+                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3" /> Attached & Active
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">Digital Stamp Only</span>
+                  )}
+                </div>
+
+                {viewingDoctor.signatureUrl ? (
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-card border border-border rounded-xl">
+                    <div className="bg-white border border-slate-200 rounded-lg p-2 min-w-[140px] max-w-[200px] h-20 flex items-center justify-center shadow-xs">
+                      <img
+                        src={viewingDoctor.signatureUrl}
+                        alt="Doctor Signature Preview"
+                        className="max-h-16 max-w-full object-contain"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-1">
+                      <p className="text-xs font-semibold text-foreground">Verified Doctor Signature</p>
+                      <p className="text-[11px] text-muted-foreground">Stamped on authorized lab test reports</p>
+                      <a
+                        href={viewingDoctor.signatureUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-teal-600 hover:underline pt-1 font-semibold"
+                      >
+                        <ExternalLink className="w-3 h-3" /> View High-Res Signature
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">Using standard digital stamp on medical reports.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-6 border-t border-border flex items-center justify-between gap-3 flex-shrink-0 bg-card">
+              <button
+                onClick={() => {
+                  const d = viewingDoctor;
+                  setViewingDoctor(null);
+                  openPortalForDoctor(d);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300 text-xs font-semibold border border-teal-200/80 transition-colors cursor-pointer"
+              >
+                <Activity className="w-3.5 h-3.5" /> View Doctor Portal
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setViewingDoctor(null)}
+                  className="px-4 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    const d = viewingDoctor;
+                    setViewingDoctor(null);
+                    openEdit(d);
+                  }}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors shadow-md shadow-teal-600/20 cursor-pointer"
+                >
+                  <Pencil className="w-4 h-4" /> Edit Doctor
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
