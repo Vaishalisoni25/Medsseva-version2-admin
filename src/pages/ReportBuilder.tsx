@@ -29,10 +29,11 @@ import {
   Loader2,
   Sparkles,
   FileCheck,
+  FlaskConical,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { branchService, Branch } from '../services/branch.service';
-import { doctorService, testService, packageService } from '../services/api';
+import { doctorService, testService, packageService, staffService } from '../services/api';
 import { useToast } from '../components/Toast';
 import { customFormatService } from '../services/customFormat.service';
 import { CustomReportTemplate } from '../types/customFormat';
@@ -87,6 +88,9 @@ type VerificationDetails = {
   doctorDesignation: string;
   doctorVerifiedAt: string;
   doctorSignatureUrl?: string;
+  technicianName: string;
+  technicianQualification: string;
+  technicianSignatureUrl?: string;
 };
 
 const computeFlag = (value: string, param: ParameterEntry): Flag => {
@@ -260,6 +264,9 @@ const emptyVerification = (): VerificationDetails => ({
   doctorDesignation: '',
   doctorVerifiedAt: new Date().toISOString(),
   doctorSignatureUrl: '',
+  technicianName: '',
+  technicianQualification: 'DMLT',
+  technicianSignatureUrl: '',
 });
 
 export const ReportBuilderPage: React.FC = () => {
@@ -286,6 +293,8 @@ export const ReportBuilderPage: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [availableDoctors, setAvailableDoctors] = useState<any[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
+  const [availableTechnicians, setAvailableTechnicians] = useState<any[]>([]);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [reportTemplate, setReportTemplate] = useState<'STANDARD' | 'DETAILED'>('STANDARD');
@@ -498,6 +507,48 @@ export const ReportBuilderPage: React.FC = () => {
     });
   }, [verification.reportBranchId, isReportCreated]);
 
+  useEffect(() => {
+    const branchId = verification.reportBranchId;
+    if (!branchId) {
+      setAvailableTechnicians([]);
+      setSelectedTechnicianId('');
+      return;
+    }
+
+    staffService.getStaff({ branchId }).then(res => {
+      const allStaff = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
+      const branchTechs = allStaff.filter((s: any) => {
+        const matchesBranch = !s.branchId || s.branchId === branchId || s.branch?.id === branchId;
+        const text = `${s.designation || ''} ${s.department || ''} ${s.role?.name || ''} ${s.role?.slug || ''}`.toLowerCase();
+        return matchesBranch && /technician|technologist|lab|pathology/i.test(text);
+      });
+      setAvailableTechnicians(branchTechs);
+
+      if (isReportCreated) return;
+
+      if (branchTechs.length > 0) {
+        const matchedTech = branchTechs.find((t: any) => t.id === selectedTechnicianId) || branchTechs[0];
+        setSelectedTechnicianId(matchedTech.id);
+        setVerification(v => ({
+          ...v,
+          technicianName: matchedTech.user?.name || matchedTech.name || '',
+          technicianQualification: matchedTech.qualification || 'DMLT',
+          technicianSignatureUrl: matchedTech.signatureUrl || '',
+        }));
+      } else {
+        setSelectedTechnicianId('');
+        setVerification(v => ({
+          ...v,
+          technicianName: '',
+          technicianQualification: 'DMLT',
+          technicianSignatureUrl: '',
+        }));
+      }
+    }).catch(err => {
+      console.error('Failed to load branch lab technicians:', err);
+    });
+  }, [verification.reportBranchId, isReportCreated]);
+
   const handleSelectBooking = useCallback((booking: any) => {
     setSelectedBooking(booking);
     setShowModal(false);
@@ -527,6 +578,22 @@ export const ReportBuilderPage: React.FC = () => {
     const fallbackBranchId = booking.collectionMode === 'HOME'
         ? (booking.sampleDelivery?.branch?.id || '')
         : (booking.branchId || '');
+
+      let techName = existingReport.technicianName || '';
+      let techQual = existingReport.technicianQualification || 'DMLT';
+      let techSig = existingReport.technicianSignatureUrl || '';
+      if (!techName && existingReport.internalNotes?.includes('[TECH:')) {
+        try {
+          const m = existingReport.internalNotes.match(/\[TECH:(\{.*?\})\]/);
+          if (m && m[1]) {
+            const parsed = JSON.parse(m[1]);
+            techName = parsed.name || techName;
+            techQual = parsed.qualification || techQual;
+            techSig = parsed.signatureUrl || techSig;
+          }
+        } catch (e) {}
+      }
+
       setVerification({
         reportBranchId: existingReport.reportBranchId || fallbackBranchId,
         doctorName: existingReport.doctorName || '',
@@ -535,6 +602,9 @@ export const ReportBuilderPage: React.FC = () => {
         doctorDesignation: existingReport.doctorDesignation || '',
         doctorVerifiedAt: existingReport.doctorVerifiedAt || new Date().toISOString(),
         doctorSignatureUrl: existingReport.doctorSignatureUrl || (existingReport as any).signatureUrl || '',
+        technicianName: techName,
+        technicianQualification: techQual,
+        technicianSignatureUrl: techSig,
       });
     } else {
       setReportTemplate('STANDARD');
@@ -667,6 +737,9 @@ export const ReportBuilderPage: React.FC = () => {
       doctorDesignation: verification.doctorDesignation || null,
       doctorVerifiedAt: verification.doctorVerifiedAt || null,
       doctorSignatureUrl: verification.doctorSignatureUrl || null,
+      technicianName: verification.technicianName || null,
+      technicianQualification: verification.technicianQualification || null,
+      technicianSignatureUrl: verification.technicianSignatureUrl || null,
     };
   };
 
@@ -1485,6 +1558,156 @@ const filteredBookings = useMemo(() => {
                         )}
                       </div>
                     )}
+                  </div>
+
+                  {/* Lab Technician Verification Card */}
+                  <div className="space-y-3 pt-3 border-t border-border">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                      <span className="flex items-center gap-1.5"><FlaskConical className="h-3 w-3 text-indigo-600" /> Lab Technician / Incharge Details</span>
+                      {isReportCreated ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 flex items-center gap-1">
+                          🔒 Locked (Report Generated)
+                        </span>
+                      ) : (
+                        availableTechnicians.length > 0 && (
+                          <span className="text-[10px] font-normal text-indigo-600 dark:text-indigo-400">
+                            {availableTechnicians.length} Lab Technician{availableTechnicians.length > 1 ? 's' : ''} available
+                          </span>
+                        )
+                      )}
+                    </div>
+
+                    {/* Branch Technician Dropdown / Locked State */}
+                    {isReportCreated ? (
+                      <div className="bg-muted/50 border border-border/80 rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FlaskConical className="w-4 h-4 text-indigo-600" />
+                          <div className="text-xs">
+                            <span className="font-bold text-foreground">
+                              {verification.technicianName || 'Lab Technician Profile'}
+                            </span>
+                            {verification.technicianQualification && (
+                              <span className="text-muted-foreground ml-1.5">({verification.technicianQualification})</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-semibold text-muted-foreground bg-card border border-border px-2 py-0.5 rounded-md">
+                          Non-editable (Report Generated)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl p-3">
+                        <label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-1 block uppercase">
+                          Select Lab Technician from Registered Branch Staff
+                        </label>
+                        <select
+                          value={selectedTechnicianId}
+                          onChange={e => {
+                            const techId = e.target.value;
+                            setSelectedTechnicianId(techId);
+                            const tech = availableTechnicians.find(t => t.id === techId);
+                            if (tech) {
+                              setVerification(v => ({
+                                ...v,
+                                technicianName: tech.user?.name || tech.name || '',
+                                technicianQualification: tech.qualification || 'DMLT',
+                                technicianSignatureUrl: tech.signatureUrl || '',
+                              }));
+                            } else {
+                              setVerification(v => ({
+                                ...v,
+                                technicianName: '',
+                                technicianQualification: 'DMLT',
+                                technicianSignatureUrl: '',
+                              }));
+                            }
+                          }}
+                          className="w-full text-xs font-semibold bg-background border border-indigo-500/30 rounded-lg px-2.5 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value="">
+                            {availableTechnicians.length === 0
+                              ? (verification.reportBranchId ? '-- No Lab Technicians Found for this Branch --' : '-- Select Branch First --')
+                              : '-- Choose Registered Lab Technician (Auto-fill) --'}
+                          </option>
+                          {availableTechnicians.map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.user?.name || t.name} ({t.qualification || 'DMLT'} - {t.designation || 'Lab Technician'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground mb-1 block">Technician Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Lokesh Sharma"
+                          value={verification.technicianName}
+                          disabled={isReportCreated}
+                          readOnly={isReportCreated}
+                          onChange={e => setVerification(v => ({ ...v, technicianName: e.target.value }))}
+                          className={cn(
+                            "w-full text-xs border rounded-lg px-2.5 py-2 outline-none transition-colors",
+                            isReportCreated
+                              ? "bg-muted/70 text-foreground cursor-not-allowed border-dashed border-border font-medium select-none"
+                              : "border-input focus:border-indigo-600 bg-card"
+                          )}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-muted-foreground mb-1 block">Qualification</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. DMLT / BMLT"
+                          value={verification.technicianQualification}
+                          disabled={isReportCreated}
+                          readOnly={isReportCreated}
+                          onChange={e => setVerification(v => ({ ...v, technicianQualification: e.target.value }))}
+                          className={cn(
+                            "w-full text-xs border rounded-lg px-2.5 py-2 outline-none transition-colors",
+                            isReportCreated
+                              ? "bg-muted/70 text-foreground cursor-not-allowed border-dashed border-border font-medium select-none"
+                              : "border-input focus:border-indigo-600 bg-card"
+                          )}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 pt-1 border-t border-border/50">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-bold text-muted-foreground">Technician Signature</span>
+                          {verification.technicianSignatureUrl ? (
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                              <Check className="h-3 w-3" /> Uploaded Signature Ready
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
+                              Using Digital Verification Fallback
+                            </span>
+                          )}
+                        </div>
+                        {verification.technicianSignatureUrl ? (
+                          <div className="flex items-center gap-3 p-2 bg-muted/40 rounded-lg border border-border">
+                            <div className="h-10 px-3 py-1 bg-white rounded border border-border flex items-center justify-center shadow-xs">
+                              <img
+                                src={verification.technicianSignatureUrl}
+                                alt="Technician Signature"
+                                className="max-h-8 max-w-[120px] object-contain"
+                                crossOrigin="anonymous"
+                              />
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              Actual uploaded technician signature will appear on the final report footer.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-muted-foreground bg-muted/30 p-2 rounded-lg border border-dashed border-border">
+                            No uploaded signature for this technician. The "TECHNICIAN VERIFIED ✓" digital stamp will be displayed. You can upload their signature anytime in Staff Management.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-3 pt-3 border-t border-border">

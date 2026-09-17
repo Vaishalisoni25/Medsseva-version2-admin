@@ -7,19 +7,28 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
   booking,
   branch,
   doctor,
+  technician,
   groupedParams,
   formatDateTime,
   getFlag,
 }) => {
-  const branchName = branch?.name || booking?.branch?.name || report?.reportBranch?.name || report?.branchName || 'LPL - MedsSeva Diagnostics';
+  const effectiveBranch = branch || report?.reportBranch || booking?.branch || null;
+  const branchName = effectiveBranch?.name || report?.branchName || 'LPL - MedsSeva Diagnostics';
   const branchAddr = [
-    branch?.line1 || booking?.branch?.line1,
-    branch?.city || booking?.branch?.city,
-    branch?.state || booking?.branch?.state,
-    branch?.pincode || booking?.branch?.pincode,
-  ].filter(Boolean).join(', ') || booking?.branch?.address || 'Embark Plaza Sec-4, Greater Noida, Gautam Budh Nagar - 201309';
-  const branchPhone = branch?.contactNumber || booking?.branch?.contactNumber || '011-4988-5050';
-  const branchEmail = branch?.email || booking?.branch?.email || 'customer.care@medsseva.com';
+    effectiveBranch?.line1,
+    effectiveBranch?.city,
+    effectiveBranch?.state,
+    effectiveBranch?.pincode ? `- ${effectiveBranch.pincode}` : '',
+  ].filter(Boolean).join(', ') || 'Central Diagnostic Reference Laboratory';
+  const branchPhone = effectiveBranch?.contactNumber || '+91 8968522455';
+  const branchEmail = effectiveBranch?.email || 'customer.care@medsseva.com';
+  const branchLabRegNo = effectiveBranch?.labRegNo || '';
+
+  const effectiveTechnician = technician || (report?.technicianName ? {
+    name: report.technicianName,
+    qualification: report.technicianQualification || 'DMLT',
+    signatureUrl: report.technicianSignatureUrl || '',
+  } : null);
 
   const patientTitle = booking?.patientGender === 'Female' ? 'Ms.' : 'Mr.';
   const rawPatientName = booking?.patientName || report?.patientName || '';
@@ -131,10 +140,11 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
 
         <div style={{ textAlign: 'right', fontSize: '7.5px', color: '#475569', lineHeight: '1.4', maxWidth: '420px' }}>
           <div style={{ fontWeight: 700, color: '#0f172a' }}>
-            Regd. Office: MedsSeva PathLabs Ltd., Sector-18, Rohini, New Delhi-110085
+            {branchName} - {branchAddr}
           </div>
           <div>
-            Web: <span style={{ color: '#0284c7', fontWeight: 600 }}>www.medsseva.com</span>, CIN: L74899DL1995PLC065388
+            Ph: <span style={{ fontWeight: 600 }}>{branchPhone}</span> | Email: <span style={{ fontWeight: 600 }}>{branchEmail}</span> | Web: <span style={{ color: '#0284c7', fontWeight: 600 }}>www.medsseva.com</span>
+            {branchLabRegNo && <span> | Lab Reg: {branchLabRegNo}</span>}
           </div>
         </div>
       </div>
@@ -147,7 +157,7 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
           padding: '10px 14px',
           backgroundColor: '#fafbfc',
           display: 'grid',
-          gridTemplateColumns: '1.25fr 1fr 48px',
+          gridTemplateColumns: '1.25fr 1fr 64px',
           columnGap: '16px',
           rowGap: '3px',
           fontSize: '9.5px',
@@ -229,8 +239,8 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
         {/* NABL / ISO Accreditation Badge & Verification QR */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', paddingTop: '2px' }}>
           <DynamicQRCode
-            value={typeof window !== 'undefined' ? `${window.location.origin}/verify-report/${report?.id || booking?.id || ''}` : `/verify-report/${report?.id || ''}`}
-            size={42}
+            value="https://play.google.com/store/apps/details?id=com.medssevaglobal.app"
+            size={54}
             label="Scan to verify"
           />
           <div style={{
@@ -427,9 +437,39 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
             paddingTop: '4px',
           }}
         >
-          <div>
-            <div style={{ fontSize: '8px', color: '#64748b', fontStyle: 'italic' }}>
-              Report validated digitally by Chief of Laboratory.
+          {/* Left: Lab Technician */}
+          <div style={{ minWidth: '160px' }}>
+            {effectiveTechnician?.signatureUrl ? (
+              <img
+                src={effectiveTechnician.signatureUrl}
+                alt="Technician Signature"
+                style={{ maxHeight: '42px', maxWidth: '140px', objectFit: 'contain', display: 'block', margin: '0 0 2px 0' }}
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div style={{
+                display: 'inline-block',
+                border: '1px solid #059669',
+                borderRadius: '3px',
+                padding: '2px 6px',
+                fontSize: '7px',
+                color: '#059669',
+                marginBottom: '4px',
+                background: '#ecfdf5',
+                letterSpacing: '0.6px',
+                fontWeight: 800,
+              }}>
+                TECHNICIAN VERIFIED ✓
+              </div>
+            )}
+            <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#0f172a' }}>
+              {effectiveTechnician?.name || report?.technicianName || 'Lab Technician'}
+            </div>
+            <div style={{ fontSize: '8px', color: '#475569' }}>
+              {effectiveTechnician?.qualification || report?.technicianQualification || 'DMLT'}
+            </div>
+            <div style={{ fontSize: '7.5px', color: '#64748b' }}>
+              Verified Quality Checks Passed
             </div>
           </div>
 

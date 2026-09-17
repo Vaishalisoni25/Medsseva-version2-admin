@@ -23,7 +23,7 @@ const T = {
 };
 
 export const DummyQRCode: React.FC<{ size?: number; label?: string; value?: string }> = ({ size = 48, label = 'SCAN TO VERIFY', value = '' }) => (
-  <DynamicQRCode value={value || (typeof window !== 'undefined' ? `${window.location.origin}/verify-report` : '')} size={size} label={label} />
+  <DynamicQRCode value={value || 'https://play.google.com/store/apps/details?id=com.medssevaglobal.app'} size={size} label={label} />
 );
 
 export const DummyBarcode: React.FC<{ value?: string; height?: number; showCode?: boolean }> = ({ value = '', height = 22, showCode = true }) => (
@@ -71,6 +71,7 @@ export interface TemplateProps {
   booking: any;
   branch: any;
   doctor: any;
+  technician?: any;
   groupedParams: Record<string, any[]>;
   generatedOn: string;
   formatDateTime: (dt: string | null | undefined, includeTime?: boolean) => string;
@@ -83,20 +84,29 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
   booking,
   branch,
   doctor,
+  technician,
   groupedParams,
   generatedOn,
   formatDateTime,
   getFlag,
 }) => {
-  const branchName = branch?.name || booking?.branch?.name || report?.reportBranch?.name || report?.branchName || 'GN Healthcare';
+  const effectiveBranch = branch || report?.reportBranch || booking?.branch || null;
+  const branchName = effectiveBranch?.name || report?.branchName || 'MedsSeva Healthcare & Diagnostic Lab';
   const branchAddr = [
-    branch?.line1 || booking?.branch?.line1,
-    branch?.city || booking?.branch?.city,
-    branch?.state || booking?.branch?.state,
-    branch?.pincode || booking?.branch?.pincode,
-  ].filter(Boolean).join(', ') || booking?.branch?.address || 'Ranchi Colony, Gali No. 2, Quality Chowk, Ludhiana - 142022';
-  const branchPhone = branch?.contactNumber || booking?.branch?.contactNumber || '+91 8968522455';
-  const branchEmail = branch?.email || booking?.branch?.email || '';
+    effectiveBranch?.line1,
+    effectiveBranch?.city,
+    effectiveBranch?.state,
+    effectiveBranch?.pincode ? `- ${effectiveBranch.pincode}` : '',
+  ].filter(Boolean).join(', ') || 'Central Diagnostic Reference Laboratory';
+  const branchPhone = effectiveBranch?.contactNumber || '+91 8968522455';
+  const branchEmail = effectiveBranch?.email || 'support@medsseva.com';
+  const branchLabRegNo = effectiveBranch?.labRegNo || '';
+
+  const effectiveTechnician = technician || (report?.technicianName ? {
+    name: report.technicianName,
+    qualification: report.technicianQualification || 'DMLT',
+    signatureUrl: report.technicianSignatureUrl || '',
+  } : null);
 
   const rawPatientName = booking?.patientName || report?.patientName || '';
   const patientDisplayName = rawPatientName.toLowerCase().startsWith('mr') ||
@@ -173,7 +183,8 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
             Authorized Franchise Partner | MedsSeva Pathology Lab
           </div>
           <div style={{ fontSize: '8px', color: T.slate600, lineHeight: '1.4' }}>
-            <span>Ph: {branchPhone}</span> | <span>www.medsseva.com</span> | <span>{branchAddr}</span>
+            <span>Ph: {branchPhone}</span> | <span>{branchEmail || 'www.medsseva.com'}</span> | <span>{branchAddr}</span>
+            {branchLabRegNo && <span> | Lab Reg No: {branchLabRegNo}</span>}
           </div>
         </div>
       </div>
@@ -186,7 +197,7 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
         paddingTop: '8px',
         paddingBottom: '10px',
         display: 'grid',
-        gridTemplateColumns: '1.25fr 1fr 56px',
+        gridTemplateColumns: '1.25fr 1fr 68px',
         gap: '12px',
         alignItems: 'center',
       }}>
@@ -278,8 +289,8 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
         {/* Far Right: Dynamic Verification QR Code */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <DynamicQRCode
-            value={typeof window !== 'undefined' ? `${window.location.origin}/verify-report/${report?.id || booking?.id || ''}` : `/verify-report/${report?.id || ''}`}
-            size={48}
+            value="https://play.google.com/store/apps/details?id=com.medssevaglobal.app"
+            size={58}
             label="Scan to verify"
           />
         </div>
@@ -423,10 +434,40 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
           alignItems: 'flex-end',
           paddingTop: '8px',
         }}>
-          {/* Left: Lab Incharge */}
-          <div>
-            <div style={{ fontSize: '9.5px', fontWeight: 800, color: '#0f172a' }}>DMLT, Lab Incharge</div>
-            <div style={{ fontSize: '7.5px', color: T.slate500, marginTop: '2px' }}>Verified Quality Checks Passed</div>
+          {/* Left: Lab Technician */}
+          <div style={{ minWidth: '160px' }}>
+            {effectiveTechnician?.signatureUrl ? (
+              <img
+                src={effectiveTechnician.signatureUrl}
+                alt="Technician Signature"
+                style={{ maxHeight: '42px', maxWidth: '140px', objectFit: 'contain', display: 'block', margin: '0 0 2px 0' }}
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div style={{
+                display: 'inline-block',
+                border: '1px solid #059669',
+                borderRadius: '3px',
+                padding: '2px 6px',
+                fontSize: '7px',
+                color: '#059669',
+                marginBottom: '4px',
+                background: '#ecfdf5',
+                letterSpacing: '0.6px',
+                fontWeight: 800,
+              }}>
+                TECHNICIAN VERIFIED ✓
+              </div>
+            )}
+            <div style={{ fontSize: '10.5px', fontWeight: 800, color: '#0f172a' }}>
+              {effectiveTechnician?.name || report?.technicianName || 'Lab Technician'}
+            </div>
+            <div style={{ fontSize: '7.5px', color: T.slate600, marginTop: '1px', fontWeight: 600 }}>
+              {effectiveTechnician?.qualification || report?.technicianQualification || 'DMLT'}
+            </div>
+            <div style={{ fontSize: '7.5px', color: T.slate500, marginTop: '1px' }}>
+              Verified Quality Checks Passed
+            </div>
           </div>
 
           {/* Center: Powered by MedsSeva & Page */}

@@ -72,6 +72,31 @@ const DEFAULT_SAMPLE_ITEMS: SampleInvoiceItem[] = [
   },
 ];
 
+function convertNumberToWords(amount: number): string {
+  if (!amount || isNaN(amount) || amount <= 0) return 'Rupees Zero Only';
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function numToWords(n: number): string {
+    if (n === 0) return '';
+    if (n < 20) return ones[n] + ' ';
+    if (n < 100) return tens[Math.floor(n / 10)] + ' ' + ones[n % 10] + ' ';
+    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred ' + numToWords(n % 100);
+    if (n < 100000) return numToWords(Math.floor(n / 1000)) + ' Thousand ' + numToWords(n % 1000);
+    if (n < 10000000) return numToWords(Math.floor(n / 100000)) + ' Lakh ' + numToWords(n % 100000);
+    return numToWords(Math.floor(n / 10000000)) + ' Crore ' + numToWords(n % 10000000);
+  }
+
+  const whole = Math.floor(amount);
+  const paise = Math.round((amount - whole) * 100);
+  let words = 'Rupees ' + numToWords(whole).trim();
+  if (paise > 0) {
+    words += ' and ' + numToWords(paise).trim() + ' Paise';
+  }
+  return words + ' Only';
+}
+
 export const LiveInvoicePreview: React.FC<LiveInvoicePreviewProps> = ({
   template,
   invoiceData,
@@ -147,32 +172,54 @@ export const LiveInvoicePreview: React.FC<LiveInvoicePreviewProps> = ({
     : { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' };
 
   const invoice = {
-    number: invoiceData?.invoiceNumber || 'INV-2026-004812',
-    receiptNumber: invoiceData?.receiptNumber || 'REC-2026-004812',
-    date: invoiceData?.date || '12/03/2026',
+    number: invoiceData?.invoiceNumber || (invoiceData ? 'INV-N/A' : 'INV-2026-004812'),
+    receiptNumber: invoiceData?.receiptNumber || (invoiceData ? 'REC-N/A' : 'REC-2026-004812'),
+    date: invoiceData?.date || (invoiceData ? new Date().toLocaleDateString('en-IN') : '12/03/2026'),
     dueDate: invoiceData?.dueDate || 'Immediate',
     status: displayStatus,
-    paymentMethod: invoiceData?.paymentMethod || 'Online (Razorpay / UPI)',
-    transactionId: invoiceData?.transactionId || 'pay_P92kL109zM821a',
-    bookingCode: invoiceData?.bookingCode || 'MEDS-88219',
-    patientName: invoiceData?.patientName || 'Mr. Rajesh Kumar Verma',
-    patientId: invoiceData?.patientId || 'UHID-2026-98124',
-    patientAge: invoiceData?.patientAge || 42,
-    patientGender: invoiceData?.patientGender || 'Male',
-    patientMobile: invoiceData?.patientMobile || '+91 98765 43210',
-    patientEmail: invoiceData?.patientEmail || 'rajesh.verma@example.com',
-    patientAddress: invoiceData?.address || 'H.No 412, Sector 14, Urban Estate, Gurugram, Haryana - 122001',
+    paymentMethod: invoiceData?.paymentMethod || (invoiceData ? 'Online' : 'Online (Razorpay / UPI)'),
+    transactionId: invoiceData?.transactionId || (invoiceData ? 'N/A' : 'pay_P92kL109zM821a'),
+    bookingCode: invoiceData?.bookingCode || (invoiceData ? 'N/A' : 'MEDS-88219'),
+    patientName: invoiceData?.patientName || (invoiceData ? 'Patient' : 'Mr. Rajesh Kumar Verma'),
+    patientId: invoiceData?.patientId || (invoiceData ? 'N/A' : 'UHID-2026-98124'),
+    patientAge: invoiceData?.patientAge ?? (invoiceData ? '' : 42),
+    patientGender: invoiceData?.patientGender ?? (invoiceData ? '' : 'Male'),
+    patientMobile: invoiceData?.patientMobile || (invoiceData ? 'N/A' : '+91 98765 43210'),
+    patientEmail: invoiceData?.patientEmail || (invoiceData ? '' : 'rajesh.verma@example.com'),
+    patientAddress: invoiceData?.patientAddress || invoiceData?.address || (invoiceData ? '' : 'H.No 412, Sector 14, Urban Estate, Gurugram, Haryana - 122001'),
     billTo: invoiceData?.billTo || 'Self / Patient',
   };
 
-  const items = (invoiceData?.items as SampleInvoiceItem[]) || DEFAULT_SAMPLE_ITEMS;
-  const subtotal = items.reduce((acc, item) => acc + item.rate * item.quantity, 0);
-  const totalDiscount = items.reduce((acc, item) => acc + item.discount, 0);
-  const taxableAmount = subtotal - totalDiscount;
-  const cgst = Math.round((taxableAmount * 0.025) * 100) / 100;
-  const sgst = Math.round((taxableAmount * 0.025) * 100) / 100;
-  const totalTax = cgst + sgst;
-  const grandTotal = taxableAmount + totalTax;
+  const isTemplatePreview = !invoiceData;
+  const items = (invoiceData?.items && invoiceData.items.length > 0)
+    ? (invoiceData.items as SampleInvoiceItem[])
+    : isTemplatePreview
+    ? DEFAULT_SAMPLE_ITEMS
+    : [];
+
+  const calculatedSubtotal = items.reduce((acc, item) => acc + item.rate * item.quantity, 0);
+  const calculatedDiscount = items.reduce((acc, item) => acc + item.discount, 0);
+
+  const subtotal = invoiceData?.subtotal !== undefined && invoiceData?.subtotal !== null
+    ? Number(invoiceData.subtotal)
+    : calculatedSubtotal;
+
+  const totalDiscount = invoiceData?.discount !== undefined && invoiceData?.discount !== null
+    ? Number(invoiceData.discount)
+    : calculatedDiscount;
+
+  const taxableAmount = Math.max(0, subtotal - totalDiscount);
+
+  const totalTax = invoiceData?.tax !== undefined && invoiceData?.tax !== null
+    ? Number(invoiceData.tax)
+    : Math.round((taxableAmount * 0.05) * 100) / 100;
+
+  const cgst = Math.round((totalTax / 2) * 100) / 100;
+  const sgst = Math.round((totalTax / 2) * 100) / 100;
+
+  const grandTotal = invoiceData?.totalAmount !== undefined && invoiceData?.totalAmount !== null
+    ? Number(invoiceData.totalAmount)
+    : taxableAmount + totalTax;
 
   const currentScale = scale || 1;
   const scaledWidth = Math.round(794 * currentScale);
@@ -318,8 +365,8 @@ export const LiveInvoicePreview: React.FC<LiveInvoicePreviewProps> = ({
               {qr.enabled && qr.position === 'header_right' && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <DynamicQRCode
-                    value={`https://medsseva.com/verify-invoice/${invoice.bookingCode}`}
-                    size={qr.size || 48}
+                    value="https://play.google.com/store/apps/details?id=com.medssevaglobal.app"
+                    size={Math.max(qr.size || 58, 58)}
                     label={qr.label || 'Scan to verify'}
                   />
                 </div>
@@ -381,7 +428,11 @@ export const LiveInvoicePreview: React.FC<LiveInvoicePreviewProps> = ({
                     <tr>
                       <td style={{ color: '#64748b', fontWeight: 600 }}>Age / Gender</td>
                       <td style={{ color: '#64748b' }}>:</td>
-                      <td style={{ color: '#0f172a' }}>{invoice.patientAge} Yrs / {invoice.patientGender}</td>
+                      <td style={{ color: '#0f172a' }}>
+                        {invoice.patientAge ? `${invoice.patientAge} Yrs` : ''}
+                        {invoice.patientAge && invoice.patientGender ? ' / ' : ''}
+                        {invoice.patientGender || (!invoice.patientAge ? 'N/A' : '')}
+                      </td>
                     </tr>
                     <tr>
                       <td style={{ color: '#64748b', fontWeight: 600 }}>Mobile</td>
@@ -503,7 +554,7 @@ export const LiveInvoicePreview: React.FC<LiveInvoicePreviewProps> = ({
                 <div style={{ padding: '6px 10px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', fontSize: '8px' }}>
                   <strong style={{ color: '#166534' }}>Amount in Words: </strong>
                   <span style={{ color: '#14532d', textTransform: 'capitalize' }}>
-                    Rupees Two Thousand Two Hundred Fifty Only
+                    {convertNumberToWords(grandTotal)}
                   </span>
                 </div>
               )}
@@ -540,11 +591,15 @@ export const LiveInvoicePreview: React.FC<LiveInvoicePreviewProps> = ({
                   {fields.showTaxBreakdown && (
                     <>
                       <tr>
-                        <td style={{ color: '#64748b', paddingBottom: '4px', verticalAlign: 'middle' }}>CGST (2.5%)</td>
+                        <td style={{ color: '#64748b', paddingBottom: '4px', verticalAlign: 'middle' }}>
+                          CGST {taxableAmount > 0 && totalTax > 0 ? `(${((totalTax / taxableAmount / 2) * 100).toFixed(1).replace('.0', '')}%)` : '(2.5%)'}
+                        </td>
                         <td style={{ textAlign: 'right', fontFamily: 'monospace', paddingBottom: '4px', verticalAlign: 'middle' }}>₹{cgst.toFixed(2)}</td>
                       </tr>
                       <tr>
-                        <td style={{ color: '#64748b', paddingBottom: '6px', verticalAlign: 'middle' }}>SGST (2.5%)</td>
+                        <td style={{ color: '#64748b', paddingBottom: '6px', verticalAlign: 'middle' }}>
+                          SGST {taxableAmount > 0 && totalTax > 0 ? `(${((totalTax / taxableAmount / 2) * 100).toFixed(1).replace('.0', '')}%)` : '(2.5%)'}
+                        </td>
                         <td style={{ textAlign: 'right', fontFamily: 'monospace', paddingBottom: '6px', verticalAlign: 'middle' }}>₹{sgst.toFixed(2)}</td>
                       </tr>
                     </>

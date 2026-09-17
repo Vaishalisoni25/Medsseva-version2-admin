@@ -35,7 +35,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   'PATHOLOGIST': 'Pathologist',
 };
 
-const ROLE_THEMES: Record<UserRole, { bg: string; text: string; border: string }> = {
+const ROLE_THEMES: Record<string, { bg: string; text: string; border: string }> = {
   'super_admin': { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200' },
   'franchise_admin': { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200' },
   'doctor': { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/20' },
@@ -48,6 +48,12 @@ const ROLE_THEMES: Record<UserRole, { bg: string; text: string; border: string }
   'LAB_DEPARTMENT': { bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200' },
   'EXECUTIVE': { bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200' },
   'PATHOLOGIST': { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+  'Patient': { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+  'PATHOLOGY_PARTNER': { bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-200' },
+  'executive': { bg: 'bg-indigo-50', text: 'text-indigo-800', border: 'border-indigo-200' },
+  'admin': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' },
+  'pathologist': { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+  'super-admin': { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200' },
 };
 
 import { useAppSelector } from '@/redux/hooks';
@@ -95,14 +101,44 @@ export const UsersPage: React.FC = () => {
   }, [adminUsersData, isSuperAdmin, userBranchId, currentUser]);
 
   useEffect(() => {
-    if (usersData) {
-      // If branch admin, filter patients who booked in their branch or show general
-      setBackendPatients(usersData);
+    if (usersData && Array.isArray(usersData)) {
+      const mappedPatients: User[] = usersData
+        .filter((u: any) => u.role === 'USER')
+        .map((u: any) => ({
+          id: u.id || `pat-${Math.floor(1000 + Math.random() * 9000)}`,
+          name: u.name,
+          email: u.email || (u.mobile ? `${u.mobile}@medsseva.com` : ''),
+          phone: u.mobile || '',
+          role: 'Patient' as any,
+          status: (u.isActive !== false ? 'active' : 'inactive') as 'active' | 'inactive',
+          avatarUrl: u.avatarUrl || undefined,
+          uhid: u.uhid,
+          dob: u.dob || undefined,
+          gender: u.gender || undefined,
+          bloodGroup: u.bloodGroup || undefined,
+          familyMembers: u.familyMembers,
+          branchId: u.branchId,
+        }));
+      setBackendPatients(mappedPatients);
     }
   }, [usersData]);
 
   useEffect(() => {
-    if (partnersData) setPartners(partnersData);
+    if (partnersData && Array.isArray(partnersData)) {
+      const mappedPartners: User[] = partnersData.map((p: any) => ({
+        id: p.user?.id || p.id,
+        name: p.user?.name || p.labName || 'Pathology Partner',
+        email: p.user?.email || (p.user?.mobile ? `${p.user.mobile}@medsseva.com` : ''),
+        phone: p.user?.mobile || '',
+        role: 'PATHOLOGY_PARTNER' as any,
+        status: (p.approvalStatus === 'APPROVED' ? 'active' : 'inactive') as 'active' | 'inactive',
+        labName: p.labName,
+        partnerRole: p.role,
+        approvalStatus: p.approvalStatus,
+        branchId: p.branchId,
+      }));
+      setPartners(mappedPartners);
+    }
   }, [partnersData]);
 
   useEffect(() => {
@@ -141,15 +177,16 @@ export const UsersPage: React.FC = () => {
         const data = await testService.getPartners();
         if (data && Array.isArray(data)) {
           const mapped = data.map((p: any) => ({
-            id: p.user.id,
-            name: p.user.name,
-            email: p.user.email || `${p.user.mobile}@medsseva.com`,
-            phone: p.user.mobile,
-           role: 'PATHOLOGY_PARTNER' as any,
+            id: p.user?.id || p.id,
+            name: p.user?.name || p.labName || 'Pathology Partner',
+            email: p.user?.email || (p.user?.mobile ? `${p.user.mobile}@medsseva.com` : ''),
+            phone: p.user?.mobile || '',
+            role: 'PATHOLOGY_PARTNER' as any,
             status: (p.approvalStatus === 'APPROVED' ? 'active' : 'inactive') as 'active' | 'inactive',
             labName: p.labName,
             partnerRole: p.role,
             approvalStatus: p.approvalStatus,
+            branchId: p.branchId,
           }));
           setPartners(mapped);
         }
@@ -231,27 +268,45 @@ const handleRegisterUser = (e: React.FormEvent) => {
     return partners.filter((p: any) => p.branchId === userBranchId);
   }, [partners, isSuperAdmin, userBranchId]);
 
-  const displayList = ([...adminUsers, ...filteredPatients, ...filteredPartners] as User[]).filter(user => {
-    if (!user || !user.name) return false;
-    const matchesSearch = user.name.toLowerCase().includes(search.toLowerCase()) || 
-                          (user.email && user.email.toLowerCase().includes(search.toLowerCase())) ||
-                          (user.phone && user.phone.includes(search));
-    const matchesRole = activeRole === 'All' || user.role === (activeRole as UserRole);
-    return matchesSearch && matchesRole;
-  });
+  const displayList = useMemo(() => {
+    const combined = [...adminUsers, ...filteredPatients, ...filteredPartners];
+    const seen = new Set<string>();
+    const unique = combined.filter(u => {
+      if (!u || !u.id || seen.has(u.id)) return false;
+      seen.add(u.id);
+      return true;
+    });
+
+    return unique.filter(user => {
+      if (!user || !user.name) return false;
+      const q = search.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        user.name.toLowerCase().includes(q) ||
+        (user.email && user.email.toLowerCase().includes(q)) ||
+        (user.phone && user.phone.includes(q)) ||
+        (Boolean((user as any).uhid) && String((user as any).uhid).toLowerCase().includes(q));
+
+      if (!matchesSearch) return false;
+      if (activeRole === 'All') return true;
+
+      if (activeRole === 'Patient') {
+        return (user.role as string) === 'Patient' || (user as any).role === 'USER';
+      }
+
+      if (activeRole === 'PATHOLOGY_PARTNER') {
+        return (user.role as string) === 'PATHOLOGY_PARTNER';
+      }
+
+      const uRole = String(user.role || '').toLowerCase();
+      const aRole = String(activeRole || '').toLowerCase();
+      return uRole === aRole;
+    });
+  }, [adminUsers, filteredPatients, filteredPartners, search, activeRole]);
 
   const distinctRoles = useMemo(() => {
-    if (isSuperAdmin || !userBranchId) {
-      return ['All', ...Object.keys(roleLabels), 'Patient', 'PATHOLOGY_PARTNER'];
-    }
-    const rolesInDisplay = new Set(displayList.map(u => u.role));
-    return [
-      'All',
-      ...Object.keys(roleLabels).filter(r => rolesInDisplay.has(r as any)),
-      ...(filteredPatients.length > 0 ? ['Patient'] : []),
-      ...(filteredPartners.length > 0 ? ['PATHOLOGY_PARTNER'] : [])
-    ];
-  }, [displayList, roleLabels, isSuperAdmin, userBranchId, filteredPatients, filteredPartners]);
+    return ['All', ...Object.keys(roleLabels), 'Patient', 'PATHOLOGY_PARTNER'];
+  }, [roleLabels]);
 
   // Confirmation modal state for suspending credentials
   const [confirmModal, setConfirmModal] = useState<{
@@ -374,7 +429,13 @@ if (pageLoading) {
                 : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
             )}
           >
-            {role === 'All' ? 'All Directory' : role === 'PATHOLOGY_PARTNER' ? 'Pathology Partners' : roleLabels[role] || ROLE_LABELS[role as UserRole] || role}
+            {role === 'All' 
+              ? 'All Directory' 
+              : role === 'PATHOLOGY_PARTNER' 
+                ? 'Pathology Partners' 
+                : role === 'Patient'
+                  ? 'Patient'
+                  : roleLabels[role] || ROLE_LABELS[role as UserRole] || role}
           </button>
         ))}
       </div>
@@ -392,49 +453,60 @@ if (pageLoading) {
       </div>
 
       {/* Grid / Table of Users */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {displayList.map(user => {
-          const isLocked = user.status === 'inactive';
-          const theme = ROLE_THEMES[user.role as UserRole] || { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' };
-          const isRealPatient = user.role === ('Patient' as any);
+      {displayList.length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-12 text-center text-muted-foreground">
+          <UserCircle2 className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+          <p className="font-semibold text-sm text-foreground">No users found</p>
+          <p className="text-xs text-muted-foreground mt-1">There are no users registered under this category.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {displayList.map(user => {
+            const isLocked = user.status === 'inactive';
+            const theme = ROLE_THEMES[user.role as string] || { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' };
+            const isRealPatient = (user.role as string) === 'Patient' || (user as any).role === 'USER';
+            const isPartner = (user.role as string) === 'PATHOLOGY_PARTNER';
 
-          return (
-            <motion.div
-              layout
-              key={user.id}
-              className={cn(
-                "bg-card border rounded-xl p-5 shadow-sm flex flex-col justify-between relative group transition-all",
-                isLocked ? "opacity-60 grayscale border-dashed" : "border-border hover:border-primary/30 hover:shadow-md"
-              )}
-            >
-              <div className="space-y-4">
-                {/* Head */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    {user.avatarUrl ? (
-                      <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                        {isRealPatient ? <HeartPulse className="h-5 w-5 text-emerald-600" /> : <UserCircle2 className="h-6 w-6" />}
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
-                        {user.name}
-                      </div>
-                      <div className="text-xs font-mono text-muted-foreground">
-                        {user.uhid ? `UHID: ${user.uhid}` : user.id}
+            return (
+              <div
+                key={`${user.role}-${user.id}`}
+                className={cn(
+                  "bg-card border rounded-xl p-5 shadow-sm flex flex-col justify-between relative group transition-all",
+                  isLocked ? "opacity-60 grayscale border-dashed" : "border-border hover:border-primary/30 hover:shadow-md"
+                )}
+              >
+                <div className="space-y-4">
+                  {/* Head */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+                          {isRealPatient ? <HeartPulse className="h-5 w-5 text-emerald-600" /> : <UserCircle2 className="h-6 w-6" />}
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+                          {user.name}
+                        </div>
+                        <div className="text-xs font-mono text-muted-foreground">
+                          {user.uhid ? `UHID: ${user.uhid}` : user.id}
+                        </div>
                       </div>
                     </div>
+                    
+                    <span className={cn(
+                      "text-[9px] font-black px-2 py-0.5 border rounded uppercase tracking-wide",
+                      theme.bg, theme.text, theme.border
+                    )}>
+                      {isRealPatient 
+                        ? 'Patient' 
+                        : isPartner 
+                          ? 'Pathology Partner' 
+                          : roleLabels[user.role] || ROLE_LABELS[user.role as UserRole] || user.role}
+                    </span>
                   </div>
-                  
-                  <span className={cn(
-                    "text-[9px] font-black px-2 py-0.5 border rounded uppercase tracking-wide",
-                    theme.bg, theme.text, theme.border
-                  )}>
-                {isRealPatient ? 'Patient' : (user.role as string) === 'PATHOLOGY_PARTNER' ? 'Pathology Partner' : ROLE_LABELS[user.role as UserRole] || user.role}
-                  </span>
-                </div>
 
              <div className="space-y-1.5 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
@@ -521,10 +593,11 @@ if (pageLoading) {
                   </button>
                 </div>
               )}
-            </motion.div>
+            </div>
           );
         })}
       </div>
+      )}
 
 
       <AnimatePresence>

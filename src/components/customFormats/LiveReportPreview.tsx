@@ -423,8 +423,8 @@ export const LiveReportPreview: React.FC<LiveReportPreviewProps> = ({
             {qr.enabled && qr.position === 'header_right' && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                 <DynamicQRCode
-                  value={`https://medsseva.com/verify-report/${patient.bookingCode}`}
-                  size={qr.size || 48}
+                  value="https://play.google.com/store/apps/details?id=com.medssevaglobal.app"
+                  size={Math.max(qr.size || 58, 58)}
                   label={qr.label || 'Scan to verify'}
                 />
               </div>

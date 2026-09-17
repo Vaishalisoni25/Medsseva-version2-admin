@@ -48,6 +48,7 @@ export interface ReportPDFDocumentProps {
   report?: any;
   branch?: any;
   doctor?: DoctorDetails;
+  technician?: any;
   containerId?: string;
   templateType?: ReportTemplateType;
   customTemplate?: Partial<CustomReportTemplate>;
@@ -58,6 +59,7 @@ export const ReportPDFDocument: React.FC<ReportPDFDocumentProps> = ({
   report: rawReport,
   branch: rawBranch,
   doctor: rawDoctor,
+  technician: rawTechnician,
   containerId = 'clinical-report-document',
   templateType,
   customTemplate,
@@ -103,6 +105,30 @@ export const ReportPDFDocument: React.FC<ReportPDFDocumentProps> = ({
         verifiedAt: report.doctorVerifiedAt || report.reportedDate || null,
         signatureUrl: report.doctorSignatureUrl || report.signatureUrl || '',
       } : undefined);
+
+  const technician = rawTechnician
+    ? {
+        ...rawTechnician,
+        signatureUrl: rawTechnician.signatureUrl || report.technicianSignatureUrl || '',
+      }
+    : (report.technicianName ? {
+        name: report.technicianName,
+        qualification: report.technicianQualification || 'DMLT',
+        signatureUrl: report.technicianSignatureUrl || '',
+      } : (report.internalNotes?.includes('[TECH:') ? (() => {
+        try {
+          const m = report.internalNotes.match(/\[TECH:(\{.*?\})\]/);
+          if (m && m[1]) {
+            const p = JSON.parse(m[1]);
+            return {
+              name: p.name || 'Lab Technician',
+              qualification: p.qualification || 'DMLT',
+              signatureUrl: p.signatureUrl || '',
+            };
+          }
+        } catch (e) {}
+        return undefined;
+      })() : undefined));
 
   const fmt = (dt: string | null | undefined) =>
     dt ? new Date(dt).toLocaleString('en-IN', {
@@ -290,6 +316,7 @@ export const ReportPDFDocument: React.FC<ReportPDFDocumentProps> = ({
     booking,
     branch: rawBranch || booking.branch,
     doctor,
+    technician,
     groupedParams,
     generatedOn,
     formatDateTime,

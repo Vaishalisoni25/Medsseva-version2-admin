@@ -28,8 +28,8 @@ api.interceptors.request.use((config) => {
 });
 
 export const commissionService = {
-  getAdminCommissions: (period?: string) =>
-    api.get('/commissions/admin/all', { params: { period } }).then(r => r.data),
+  getAdminCommissions: (period?: string, branchId?: string, city?: string) =>
+    api.get('/commissions/admin/all', { params: { period, branchId, city } }).then(r => r.data),
   updateConfig: (entityType: string, id: string, data: any) =>
     api.patch(`/commissions/admin/config/${entityType}/${id}`, data).then(r => r.data),
   updatePayoutStatus: (data: any) =>

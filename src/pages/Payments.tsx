@@ -52,6 +52,10 @@ export const PaymentsPage: React.FC = () => {
 
   const handleDownloadInvoicePDF = async () => {
     if (!invoicePreviewModal?.payment) return;
+    if (invoicePreviewModal.payment.invoiceUrl) {
+      window.open(invoicePreviewModal.payment.invoiceUrl, '_blank');
+      return;
+    }
     setIsExportingPDF(true);
     try {
       const code = invoicePreviewModal.payment?.booking?.bookingCode || invoicePreviewModal.payment?.id || 'Payment';
@@ -212,7 +216,7 @@ if (executeRefundThunk.fulfilled.match(result)) {
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider truncate">Total Invoiced Assets</div>
-                <div className="text-xl sm:text-2xl font-black text-foreground mt-0.5">₹{((summary as any)?.totalCaptured || 0).toLocaleString('en-IN')}</div>
+                <div className="text-xl sm:text-2xl font-black text-foreground mt-0.5">₹{((summary as any)?.totalCaptured || (summary as any)?.totalCollected || 0).toLocaleString('en-IN')}</div>
               </div>
             </div>
 
@@ -705,31 +709,88 @@ if (executeRefundThunk.fulfilled.match(result)) {
             <LiveInvoicePreview
               template={customInvoiceTemplates.find(t => t.id === invoicePreviewModal.selectedTemplateId) || {}}
               scale={typeof window !== 'undefined' && window.innerWidth < 640 ? 0.45 : 0.88}
-              invoiceData={{
-                invoiceNumber: invoicePreviewModal.payment?.invoiceNumber || `INV-${invoicePreviewModal.payment?.id?.slice(0, 8)}`,
-                receiptNumber: invoicePreviewModal.payment?.receiptNumber || `REC-${invoicePreviewModal.payment?.id?.slice(0, 8)}`,
-                date: invoicePreviewModal.payment?.paidAt ? new Date(invoicePreviewModal.payment.paidAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
-                status: ['CAPTURED', 'SUCCESS', 'PAID'].includes(String(invoicePreviewModal.payment?.status).toUpperCase()) ? 'PAID' : (invoicePreviewModal.payment?.status || 'PAID'),
-                paymentMethod: invoicePreviewModal.payment?.method || invoicePreviewModal.payment?.gateway || 'Online (Razorpay)',
-                transactionId: invoicePreviewModal.payment?.gatewayPaymentId || invoicePreviewModal.payment?.id,
-                bookingCode: invoicePreviewModal.payment?.booking?.bookingCode || 'MEDS-BOOKING',
-                patientName: invoicePreviewModal.payment?.booking?.patientName || invoicePreviewModal.payment?.user?.name || 'Patient',
-                patientId: invoicePreviewModal.payment?.booking?.uhid || invoicePreviewModal.payment?.user?.uhid || 'UHID-2026',
-                patientAge: invoicePreviewModal.payment?.booking?.patientAge || 35,
-                patientGender: invoicePreviewModal.payment?.booking?.patientGender || 'Male',
-                patientMobile: invoicePreviewModal.payment?.booking?.patientMobile || invoicePreviewModal.payment?.user?.mobile || '',
-                patientAddress: invoicePreviewModal.payment?.booking?.address || '',
-                items: invoicePreviewModal.payment?.booking?.tests?.map((t: any, idx: number) => ({
-                  id: String(idx + 1),
-                  name: t.test?.name || t.name || 'Diagnostic Investigation',
-                  code: t.test?.code || '',
-                  rate: t.test?.price || t.price || (invoicePreviewModal.payment?.amount / (invoicePreviewModal.payment?.booking?.tests?.length || 1)),
-                  quantity: 1,
-                  discount: 0,
-                  taxRate: 5,
-                  total: t.test?.discountedPrice || t.discountedPrice || t.test?.price || t.price || invoicePreviewModal.payment?.amount,
-                })),
-              }}
+              invoiceData={(() => {
+                const p = invoicePreviewModal.payment;
+                const b = p?.booking;
+                const u = b?.user || p?.user;
+
+                // Build real item list from tests
+                const testItems = (b?.tests || []).map((t: any, idx: number) => {
+                  const testObj = t.test || t;
+                  const rate = Number(testObj?.price || t.price || (p?.amount / (b?.tests?.length || 1)));
+                  const discPrice = Number(testObj?.discountedPrice || testObj?.discountPrice || t.price || rate);
+                  const discount = Math.max(0, rate - discPrice);
+                  return {
+                    id: `test-${idx + 1}`,
+                    name: testObj?.name || t.name || 'Diagnostic Investigation',
+                    code: testObj?.code || '',
+                    rate: rate,
+                    quantity: 1,
+                    discount: discount,
+                    taxRate: 5,
+                    total: discPrice,
+                  };
+                });
+
+                // Build real item list from packages
+                const packageItems = (b?.packages || []).map((pkg: any, idx: number) => {
+                  const pkgObj = pkg.package || pkg;
+                  const rate = Number(pkgObj?.price || pkg.price || 0);
+                  const discPrice = Number(pkgObj?.discountedPrice || pkgObj?.discountPrice || pkg.price || rate);
+                  const discount = Math.max(0, rate - discPrice);
+                  return {
+                    id: `pkg-${idx + 1}`,
+                    name: `[Package] ${pkgObj?.name || pkg.name || 'Health Package'}`,
+                    code: pkgObj?.code || '',
+                    rate: rate,
+                    quantity: 1,
+                    discount: discount,
+                    taxRate: 5,
+                    total: discPrice,
+                  };
+                });
+
+                const allItems = [...testItems, ...packageItems];
+                const finalItems = allItems.length > 0 ? allItems : [
+                  {
+                    id: '1',
+                    name: 'Diagnostic Investigation / Health Services',
+                    code: b?.bookingCode || 'INVESTIGATION',
+                    rate: Number(p?.subtotal || p?.amount || 0),
+                    quantity: 1,
+                    discount: Number(p?.discount || 0),
+                    taxRate: 5,
+                    total: Number(p?.amount || 0),
+                  }
+                ];
+
+                const primaryAddress = u?.addresses?.find((a: any) => a.isDefault) || u?.addresses?.[0];
+                const addressStr = primaryAddress
+                  ? `${primaryAddress.line1}${primaryAddress.city ? ', ' + primaryAddress.city : ''}${primaryAddress.state ? ', ' + primaryAddress.state : ''}${primaryAddress.pincode ? ' - ' + primaryAddress.pincode : ''}`
+                  : (b?.address || '');
+
+                return {
+                  invoiceNumber: p?.invoiceNumber || (b?.bookingCode ? `INV-${b.bookingCode}` : `INV-${p?.id?.slice(0, 8)}`),
+                  receiptNumber: p?.receiptNumber || (b?.bookingCode ? `REC-${b.bookingCode}` : `REC-${p?.id?.slice(0, 8)}`),
+                  date: p?.paidAt ? new Date(p.paidAt).toLocaleDateString('en-IN') : (p?.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')),
+                  status: ['CAPTURED', 'SUCCESS', 'PAID', 'COMPLETED'].includes(String(p?.status).toUpperCase()) ? 'PAID' : (p?.status || 'PAID'),
+                  paymentMethod: p?.method || (p?.gateway ? `${p.gateway} (Online)` : 'Online (Razorpay)'),
+                  transactionId: p?.razorpayPaymentId || p?.paymentReference || p?.gatewayPaymentId || p?.id,
+                  bookingCode: b?.bookingCode || 'MEDS-BOOKING',
+                  patientName: b?.patientName || u?.name || 'Patient',
+                  patientId: u?.uhid || b?.uhid || 'UHID-N/A',
+                  patientAge: b?.patientAge || '',
+                  patientGender: b?.patientGender || '',
+                  patientMobile: b?.patientMobile || u?.mobile || '',
+                  patientEmail: u?.email || '',
+                  patientAddress: addressStr,
+                  subtotal: p?.subtotal !== undefined && p?.subtotal !== null ? Number(p.subtotal) : undefined,
+                  discount: p?.discount !== undefined && p?.discount !== null ? Number(p.discount) : undefined,
+                  tax: p?.gst !== undefined && p?.gst !== null ? Number(p.gst) : (p?.tax !== undefined ? Number(p.tax) : undefined),
+                  totalAmount: p?.amount !== undefined && p?.amount !== null ? Number(p.amount) : undefined,
+                  items: finalItems,
+                };
+              })()}
             />
           </div>
         </div>

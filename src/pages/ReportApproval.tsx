@@ -152,7 +152,24 @@ export const ReportApprovalPage: React.FC = () => {
           signatureUrl: selectedReport.doctorSignatureUrl || selectedReport.signatureUrl || '',
         }
       : undefined;
-    return { branch, doctor };
+
+    const techName = selectedReport?.technicianName || '';
+    const techQual = selectedReport?.technicianQualification || 'DMLT';
+    const techSig = selectedReport?.technicianSignatureUrl || '';
+    let parsedTech = null;
+    if (!techName && selectedReport?.internalNotes?.includes('[TECH:')) {
+      try {
+        const m = selectedReport.internalNotes.match(/\[TECH:(\{.*?\})\]/);
+        if (m && m[1]) parsedTech = JSON.parse(m[1]);
+      } catch (e) {}
+    }
+    const technician = (techName || parsedTech) ? {
+      name: techName || parsedTech?.name || 'Lab Technician',
+      qualification: techQual || parsedTech?.qualification || 'DMLT',
+      signatureUrl: techSig || parsedTech?.signatureUrl || '',
+    } : undefined;
+
+    return { branch, doctor, technician };
   }, [selectedReport]);
 
   const generateAndDownloadPDF = useCallback(async (reportData: any, templateType: 'STANDARD' | 'DETAILED') => {
@@ -634,6 +651,7 @@ const handleFinalize = async () => {
                         }}
                         branch={buildBranchAndDoctor().branch}
                         doctor={buildBranchAndDoctor().doctor}
+                        technician={buildBranchAndDoctor().technician}
                         templateType={approvalTemplate}
                         customTemplate={customReportTemplates.find(t => t.id === selectedCustomTemplateId)}
                         containerId="clinical-report-document"
@@ -665,6 +683,7 @@ const handleFinalize = async () => {
                       }}
                       branch={buildBranchAndDoctor().branch}
                       doctor={buildBranchAndDoctor().doctor}
+                      technician={buildBranchAndDoctor().technician}
                       templateType={approvalTemplate}
                       customTemplate={customReportTemplates.find(t => t.id === selectedCustomTemplateId)}
                       containerId="pdf-export-report-document"

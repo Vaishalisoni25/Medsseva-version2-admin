@@ -1,30 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 
+export const MEDSSEVA_PLAYSTORE_URL = 'https://play.google.com/store/apps/details?id=com.medssevaglobal.app';
+
 interface DynamicQRCodeProps {
-  value: string;
+  value?: string;
   size?: number;
   label?: string;
   className?: string;
 }
 
 export const DynamicQRCode: React.FC<DynamicQRCodeProps> = ({
-  value,
-  size = 50,
+  value = MEDSSEVA_PLAYSTORE_URL,
+  size = 58,
   label = 'SCAN TO VERIFY',
   className = '',
 }) => {
   const [dataUrl, setDataUrl] = useState<string>('');
+  const qrValue = value || MEDSSEVA_PLAYSTORE_URL;
 
   useEffect(() => {
     let isMounted = true;
-    if (!value) return;
+    if (!qrValue) return;
 
-    QRCode.toDataURL(value, {
-      margin: 1,
-      width: Math.max(120, size * 2.5),
+    QRCode.toDataURL(qrValue, {
+      margin: 2,
+      width: Math.max(300, size * 4),
+      errorCorrectionLevel: 'M',
       color: {
-        dark: '#004d4f',
+        dark: '#000000',
         light: '#ffffff',
       },
     })
@@ -38,40 +42,58 @@ export const DynamicQRCode: React.FC<DynamicQRCodeProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [value, size]);
+  }, [qrValue, size]);
 
   return (
     <div
       className={className}
+      onClick={() => {
+        if (qrValue && (qrValue.startsWith('http://') || qrValue.startsWith('https://'))) {
+          window.open(qrValue, '_blank', 'noopener,noreferrer');
+        }
+      }}
+      title={qrValue ? `Scan or click to open: ${qrValue}` : undefined}
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: '3px',
+        cursor: 'pointer',
       }}
     >
       {dataUrl ? (
-        <img
-          src={dataUrl}
-          alt="Verification QR Code"
-          width={size}
-          height={size}
+        <div
           style={{
-            display: 'block',
-            borderRadius: '3px',
-            border: '1px solid #e2e8f0',
-            width: `${size}px`,
-            height: `${size}px`,
+            padding: '2px',
+            backgroundColor: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '2px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-        />
+        >
+          <img
+            src={dataUrl}
+            alt="MedsSeva App QR Code"
+            width={size}
+            height={size}
+            style={{
+              display: 'block',
+              width: `${size}px`,
+              height: `${size}px`,
+              imageRendering: 'pixelated',
+            }}
+          />
+        </div>
       ) : (
         <div
           style={{
             width: `${size}px`,
             height: `${size}px`,
             backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '3px',
+            border: '1px solid #cbd5e1',
+            borderRadius: '2px',
           }}
         />
       )}
@@ -79,7 +101,7 @@ export const DynamicQRCode: React.FC<DynamicQRCodeProps> = ({
         <div
           style={{
             fontSize: '7px',
-            color: '#64748b',
+            color: '#475569',
             fontWeight: 700,
             textAlign: 'center',
             letterSpacing: '0.3px',
