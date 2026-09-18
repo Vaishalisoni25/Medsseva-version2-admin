@@ -32,6 +32,7 @@ export interface DoctorRecord {
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
   rejectionReason?: string;
   isActive: boolean;
+  doctorType?: 'DIRECT' | 'EMPLOYEE';
   user?: {
     id: string;
     name: string;
@@ -119,6 +120,7 @@ export const DoctorsPage: React.FC = () => {
 
   // Form State
   const [userType, setUserType] = useState<'STAFF' | 'DOCTOR' | 'EMPLOYEE' | 'ADMIN'>('DOCTOR');
+  const [doctorType, setDoctorType] = useState<'DIRECT' | 'EMPLOYEE'>('EMPLOYEE');
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formMobile, setFormMobile] = useState('');
@@ -261,6 +263,7 @@ export const DoctorsPage: React.FC = () => {
     setFormQualification(defaultType === 'DOCTOR' ? 'MBBS, MD (Pathology)' : '');
     setFormRegistrationNo('');
     setFormSignatureUrl('');
+    setDoctorType('EMPLOYEE');
     setFormCommissionRate(30);
     setFormPaymentCycle('MONTHLY');
     setSelectedPerms(new Set());
@@ -290,6 +293,7 @@ export const DoctorsPage: React.FC = () => {
     setFormDesignation(d.designation || 'Consultant Pathologist');
     setFormBranchId(d.branchId || (d.branch?.id) || '');
     setFormSignatureUrl(d.signatureUrl || '');
+    setDoctorType(d.doctorType || 'EMPLOYEE');
     setFormCommissionRate(d.commissionRate !== undefined && d.commissionRate !== null ? Number(d.commissionRate) : 30);
     setFormPaymentCycle(d.paymentCycle || 'MONTHLY');
     setFormFranchiseId('');
@@ -425,6 +429,7 @@ export const DoctorsPage: React.FC = () => {
         qualification: formQualification || undefined,
         registrationNo: formRegistrationNo || undefined,
         signatureUrl: formSignatureUrl || undefined,
+        doctorType: userType === 'DOCTOR' ? doctorType : undefined,
         commissionRate: Number(formCommissionRate) || 30,
         paymentCycle: formPaymentCycle || 'MONTHLY',
       };
@@ -1314,6 +1319,17 @@ export const DoctorsPage: React.FC = () => {
                         placeholder="e.g. Senior Consultant Pathologist"
                         className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30"
                       />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-foreground mb-1 block">Doctor Type</label>
+                      <select
+                        value={doctorType}
+                        onChange={e => setDoctorType(e.target.value as 'EMPLOYEE' | 'DIRECT')}
+                        className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30 font-semibold text-teal-800"
+                      >
+                        <option value="EMPLOYEE">Internal Employee / Pathologist</option>
+                        <option value="DIRECT">Direct Referral Partner (External)</option>
+                      </select>
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-foreground mb-1 block">Assign Branch / Area</label>
