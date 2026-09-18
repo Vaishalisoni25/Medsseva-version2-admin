@@ -43,6 +43,8 @@ export const CMSPage: React.FC = () => {
 
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerSubtitle, setBannerSubtitle] = useState('');
+  const [bannerType, setBannerType] = useState<'HERO' | 'PROMO'>('HERO');
+  const [bannerFilter, setBannerFilter] = useState<'ALL' | 'HERO' | 'PROMO'>('ALL');
   const [bannerLinkType, setBannerLinkType] = useState<Banner['linkType']>('Package');
   const [bannerLinkValue, setBannerLinkValue] = useState('');
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
@@ -114,26 +116,32 @@ useCmsBannersQuery();
 
     if (!imageUrl) return;
 
-    dispatch(createBanner({
-      title: bannerTitle,
-      subtitle: bannerSubtitle,
-      imageUrl,
-      imagePublicId,
-      linkType: bannerLinkType,
-      linkValue: bannerLinkValue || undefined,
-      isActive: true,
-      displayOrder: banners.length,
-      priority: 0,
-      cities: [],
-      branches: [],
-    }));
+    try {
+      await dispatch(createBanner({
+        title: bannerTitle,
+        subtitle: bannerSubtitle,
+        imageUrl,
+        imagePublicId,
+        bannerType,
+        linkType: bannerLinkType,
+        linkValue: bannerLinkValue || undefined,
+        isActive: true,
+        displayOrder: banners.length,
+        priority: 0,
+        cities: [],
+        branches: [],
+      })).unwrap();
 
-    setIsDrawerOpen(false);
-    setBannerTitle('');
-    setBannerSubtitle('');
-    setBannerLinkValue('');
-    setBannerImageFile(null);
-    setBannerImagePreview('');
+      setIsDrawerOpen(false);
+      setBannerTitle('');
+      setBannerSubtitle('');
+      setBannerType('HERO');
+      setBannerLinkValue('');
+      setBannerImageFile(null);
+      setBannerImagePreview('');
+    } catch (err) {
+      console.error('Failed to create banner:', err);
+    }
   };
 
   const handleToggleBanner = (banner: Banner) => {
@@ -299,10 +307,29 @@ useCmsBannersQuery();
 
                 {activeTab === 'banners' && (
                   <motion.div key="banners" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-sm font-black uppercase">Mobile Banner Pool</h3>
+                    <div className="flex flex-wrap justify-between items-center gap-3 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-sm font-black uppercase">Mobile Banner Pool</h3>
+                        <div className="flex bg-muted rounded-lg p-0.5 border text-[11px] font-bold">
+                          {(['ALL', 'HERO', 'PROMO'] as const).map(f => (
+                            <button
+                              key={f}
+                              onClick={() => setBannerFilter(f)}
+                              className={cn(
+                                "px-2.5 py-1 rounded-md transition-all",
+                                bannerFilter === f ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                              )}
+                            >
+                              {f === 'ALL' ? 'All' : f === 'HERO' ? 'Hero Banners' : 'Promo Banners'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <button
-                        onClick={() => setIsDrawerOpen(true)}
+                        onClick={() => {
+                          setBannerType(bannerFilter === 'PROMO' ? 'PROMO' : 'HERO');
+                          setIsDrawerOpen(true);
+                        }}
                         className="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-[10px] font-black flex items-center gap-1 hover:bg-teal-700"
                       >
                         <Plus className="h-3.5 w-3.5" /> Create Banner
@@ -312,10 +339,24 @@ useCmsBannersQuery();
                       <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-teal-600" /></div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {banners.map(banner => (
-                          <div key={banner.id} className={cn("border rounded-xl overflow-hidden flex flex-col", !banner.isActive && "opacity-60 border-dashed")}>
-                            <div className="h-24 relative bg-slate-100">
+                        {banners
+                          .filter(banner => {
+                            if (bannerFilter === 'HERO') return banner.bannerType !== 'PROMO';
+                            if (bannerFilter === 'PROMO') return banner.bannerType === 'PROMO';
+                            return true;
+                          })
+                          .map(banner => (
+                          <div key={banner.id} className={cn("border rounded-xl overflow-hidden flex flex-col relative", !banner.isActive && "opacity-60 border-dashed")}>
+                            <div className="h-28 relative bg-slate-100">
                               <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+                              <div className="absolute top-2 left-2">
+                                <span className={cn(
+                                  "text-[9px] font-black uppercase px-2 py-0.5 rounded shadow-sm text-white",
+                                  banner.bannerType === 'PROMO' ? "bg-amber-600" : "bg-teal-700"
+                                )}>
+                                  {banner.bannerType === 'PROMO' ? 'Promo Banner' : 'Hero Banner'}
+                                </span>
+                              </div>
                               <div className="absolute top-2 right-2 flex gap-1">
                                 <button onClick={() => handleToggleBanner(banner)} className="h-6 w-6 rounded bg-white/90 flex items-center justify-center text-slate-700 border border-slate-200 shadow">
                                   <Eye className="h-3.5 w-3.5" />
@@ -334,8 +375,14 @@ useCmsBannersQuery();
                             </div>
                           </div>
                         ))}
-                        {banners.length === 0 && (
-                          <div className="col-span-2 text-center py-10 text-muted-foreground text-xs">No banners yet. Create your first banner.</div>
+                        {banners.filter(banner => {
+                          if (bannerFilter === 'HERO') return banner.bannerType !== 'PROMO';
+                          if (bannerFilter === 'PROMO') return banner.bannerType === 'PROMO';
+                          return true;
+                        }).length === 0 && (
+                          <div className="col-span-2 text-center py-10 text-muted-foreground text-xs">
+                            {bannerFilter === 'PROMO' ? 'No promo banners yet. Click "+ Create Banner" to add one.' : 'No banners found for selected filter.'}
+                          </div>
                         )}
                       </div>
                     )}
@@ -443,9 +490,41 @@ useCmsBannersQuery();
                 <button onClick={() => setIsDrawerOpen(false)} className="p-1.5 rounded hover:bg-muted"><X className="h-5 w-5" /></button>
               </div>
               <form onSubmit={handleSaveBanner} className="flex-1 overflow-y-auto p-6 space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold">Banner Type *</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setBannerType('HERO')}
+                      className={cn(
+                        "py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center gap-0.5",
+                        bannerType === 'HERO'
+                          ? "bg-teal-50 border-teal-500 text-teal-800 shadow-sm"
+                          : "border-input bg-card text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      <span className="font-extrabold text-[12px]">Hero Banner</span>
+                      <span className="text-[10px] font-normal opacity-80">(Top Carousel)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBannerType('PROMO')}
+                      className={cn(
+                        "py-2 px-3 rounded-xl text-xs font-bold border transition-all text-center flex flex-col items-center gap-0.5",
+                        bannerType === 'PROMO'
+                          ? "bg-amber-50 border-amber-500 text-amber-800 shadow-sm"
+                          : "border-input bg-card text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      <span className="font-extrabold text-[12px]">Promo Banner</span>
+                      <span className="text-[10px] font-normal opacity-80">(Bottom Strip)</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold">Banner Label/Title *</label>
-                  <input required type="text" placeholder="e.g. Monsoon Check 20% OFF" className="w-full p-2 border border-input text-sm rounded" value={bannerTitle} onChange={e => setBannerTitle(e.target.value)} />
+                  <input required type="text" placeholder={bannerType === 'PROMO' ? "e.g. Affordable Imaging Scans 20% OFF" : "e.g. Monsoon Health Checkup"} className="w-full p-2 border border-input text-sm rounded" value={bannerTitle} onChange={e => setBannerTitle(e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold">Subtitle</label>

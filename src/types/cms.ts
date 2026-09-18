@@ -5,6 +5,7 @@ export interface Banner {
   description?: string;
   imageUrl: string;
   imagePublicId?: string;
+  bannerType?: 'HERO' | 'PROMO';
   linkType: 'Test' | 'Package' | 'Category' | 'External';
   linkValue?: string;
   priority: number;

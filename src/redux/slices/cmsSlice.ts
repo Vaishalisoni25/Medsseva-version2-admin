@@ -39,8 +39,9 @@ export const createBanner = createAsyncThunk('cms/createBanner', async (payload:
   try {
     const data = await cmsService.createBanner(payload);
     return data.banner as Banner;
-  } catch {
-    return rejectWithValue('Failed to create banner');
+  } catch (err: any) {
+    const msg = err.response?.data?.error || err.response?.data?.details || err.response?.data?.message || err.message || 'Failed to create banner';
+    return rejectWithValue(msg);
   }
 });
 
@@ -48,8 +49,9 @@ export const updateBanner = createAsyncThunk('cms/updateBanner', async ({ id, ..
   try {
     const data = await cmsService.updateBanner(id, rest);
     return data.banner as Banner;
-  } catch {
-    return rejectWithValue('Failed to update banner');
+  } catch (err: any) {
+    const msg = err.response?.data?.error || err.response?.data?.details || err.response?.data?.message || err.message || 'Failed to update banner';
+    return rejectWithValue(msg);
   }
 });
 

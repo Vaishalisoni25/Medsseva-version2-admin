@@ -45,7 +45,8 @@ const { config, banners } = useAppSelector(state => state.cms);
   };
   const { packages } = useAppSelector(state => state.tests);
 
-  const activeBanners = banners.filter(b => b.isActive);
+  const activeHeroBanners = banners.filter(b => b.isActive && b.bannerType !== 'PROMO');
+  const activePromoBanners = banners.filter(b => b.isActive && b.bannerType === 'PROMO');
   const sevaCheckPackages = packages.filter(p => p.isSevaCheck || p.discountedPrice && p.discountedPrice > 1000);
 
 
@@ -61,36 +62,72 @@ const { config, banners } = useAppSelector(state => state.cms);
     switch (sectionKey) {
       case 'hero_banner':
         return (
-          <div className="px-4 py-3" key="hero_banner">
-            <div className="relative h-32 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200 shadow-sm">
-              {activeBanners.length > 0 ? (
+          <div className="px-4 py-2 space-y-2.5" key="hero_banner">
+            {/* Hero Top Banner */}
+            <div className="relative h-28 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200 shadow-sm">
+              {activeHeroBanners.length > 0 ? (
                 <motion.div 
-                  key={activeBanners[0].id}
+                  key={activeHeroBanners[0].id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url(${activeBanners[0].imageUrl})` }}
+                  style={{ backgroundImage: `url(${activeHeroBanners[0].imageUrl})` }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-3">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-2.5">
                     <div>
-                      <div className="bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded w-max mb-1 border border-white/20">
-                        Promoted
+                      <div className="bg-teal-600/90 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded w-max mb-0.5">
+                        Hero Banner
                       </div>
-                      <h4 className="text-xs font-black text-white leading-tight tracking-tight truncate w-52">
-                        {activeBanners[0].title}
+                      <h4 className="text-[11px] font-black text-white leading-tight tracking-tight truncate w-52">
+                        {activeHeroBanners[0].title}
                       </h4>
                     </div>
                   </div>
                 </motion.div>
               ) : (
                 <div className="flex items-center justify-center h-full text-[10px] text-slate-400 italic">
-                  No active banner assigned
+                  No active hero banner
                 </div>
               )}
            
               <div className="absolute bottom-2 right-2 flex gap-1">
-                {activeBanners.map((_, i) => (
+                {activeHeroBanners.map((_, i) => (
                   <div key={i} className={cn("h-1 w-1 rounded-full", i === 0 ? "bg-white" : "bg-white/50")} />
+                ))}
+              </div>
+            </div>
+
+            {/* Promo Banner Preview */}
+            <div className="relative h-24 w-full overflow-hidden rounded-2xl bg-amber-50/50 border border-amber-200/60 shadow-sm">
+              {activePromoBanners.length > 0 ? (
+                <motion.div 
+                  key={activePromoBanners[0].id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${activePromoBanners[0].imageUrl})` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2">
+                    <div>
+                      <div className="bg-amber-500/90 text-white text-[7px] font-black uppercase px-1.5 py-0.5 rounded w-max mb-0.5">
+                        Promo Banner
+                      </div>
+                      <h4 className="text-[10px] font-black text-white leading-tight tracking-tight truncate w-52">
+                        {activePromoBanners[0].title}
+                      </h4>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-[9px] text-amber-700/70">
+                  <span className="font-bold">Static Promo Fallback</span>
+                  <span className="text-[8px] text-slate-400">Upload Promo Banner to replace</span>
+                </div>
+              )}
+
+              <div className="absolute bottom-1.5 right-2 flex gap-1">
+                {(activePromoBanners.length > 0 ? activePromoBanners : [1, 2, 3, 4]).map((_, i) => (
+                  <div key={i} className={cn("h-1 w-1 rounded-full", i === 0 ? "bg-amber-500" : "bg-slate-300")} />
                 ))}
               </div>
             </div>
