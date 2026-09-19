@@ -42,6 +42,9 @@ export const branchService = {
   getAll: (): Promise<{ success: boolean; data: Branch[] }> =>
     api.get('/branches').then(r => r.data),
 
+  getAdminLocations: (): Promise<{ success: boolean; data: any[] }> =>
+    api.get('/branches/admin-locations').then(r => r.data),
+
   getById: (id: string): Promise<{ success: boolean; data: Branch }> =>
     api.get(`/branches/${id}`).then(r => r.data),
 

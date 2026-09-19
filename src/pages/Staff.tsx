@@ -20,12 +20,17 @@ export interface StaffRecord {
   signatureUrl?: string;
   franchiseId?: string;
   branchId?: string;
+  partnerId?: string;
   userType?: string;
   branch?: {
     id: string;
     name: string;
     city: string;
     code?: string;
+  };
+  pathologyPartner?: {
+    labName: string;
+    city?: string;
   };
   role?: {
     id: string;
@@ -70,9 +75,10 @@ export const StaffPage: React.FC = () => {
   const currentUser = useAppSelector(state => state.auth.user);
   const isSuperAdmin = currentUser?.role === 'super_admin' || currentUser?.role === 'SUPER_ADMIN' || (currentUser as any)?.isSuperAdmin;
   const userBranchId = (currentUser as any)?.branchId || (currentUser as any)?.adminUser?.branchId || '';
+  const userPartnerId = (currentUser as any)?.partnerId || (currentUser as any)?.adminUser?.partnerId || '';
 
   const [staffList, setStaffList] = useState<StaffRecord[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -142,7 +148,7 @@ export const StaffPage: React.FC = () => {
     try {
       const [staffRes, branchRes] = await Promise.allSettled([
         staffService.getStaff(),
-        branchService.getAll(),
+        branchService.getAdminLocations(),
       ]);
 
       if (staffRes.status === 'fulfilled' && Array.isArray(staffRes.value)) {
@@ -173,8 +179,8 @@ export const StaffPage: React.FC = () => {
     setCustomDepartment('');
     setFormDesignation('Lab Technician');
     setCustomDesignation('');
-    const userBranch = userBranchId || (currentUser as any)?.branchId || (branches[0]?.id || '');
-    setFormBranchId(userBranch || '');
+    const userBranch = userBranchId ? `BRANCH:${userBranchId}` : (userPartnerId ? `PARTNER:${userPartnerId}` : (branches[0] ? `${branches[0].type}:${branches[0].id}` : ''));
+    setFormBranchId(userBranch);
     setFormFranchiseId('');
     setFormSignatureUrl('');
     setModalOpen(true);
@@ -206,7 +212,8 @@ export const StaffPage: React.FC = () => {
       setCustomDesignation('');
     }
 
-    setFormBranchId(s.branchId || (s as any).branch?.id || '');
+    const initBranch = s.branchId ? `BRANCH:${s.branchId}` : (s.partnerId ? `PARTNER:${s.partnerId}` : '');
+    setFormBranchId(initBranch);
     setFormFranchiseId(s.franchiseId || '');
     setFormSignatureUrl(s.signatureUrl || (s as any).adminUser?.signatureUrl || '');
     setModalOpen(true);
@@ -234,7 +241,17 @@ export const StaffPage: React.FC = () => {
       return;
     }
 
-    const targetBranchId = formBranchId || userBranchId || undefined;
+    let finalBranchId = undefined;
+    let finalPartnerId = undefined;
+    if (formBranchId) {
+      const parts = formBranchId.split(':');
+      if (parts[0] === 'BRANCH') finalBranchId = parts[1];
+      else if (parts[0] === 'PARTNER') finalPartnerId = parts[1];
+    } else if (userBranchId) {
+      finalBranchId = userBranchId;
+    } else if (userPartnerId) {
+      finalPartnerId = userPartnerId;
+    }
     const isLabTech = finalDesignation === 'Lab Technician' ||
       finalDesignation === 'Senior Lab Technician' ||
       finalDesignation.toLowerCase().includes('technician') ||
@@ -252,7 +269,8 @@ export const StaffPage: React.FC = () => {
       userType: 'EMPLOYEE',
       department: finalDepartment || undefined,
       designation: finalDesignation || undefined,
-      branchId: targetBranchId,
+      branchId: finalBranchId,
+      partnerId: finalPartnerId,
       franchiseId: formFranchiseId || undefined,
       signatureUrl: isLabTech ? (formSignatureUrl || null) : undefined,
     };
@@ -310,13 +328,20 @@ export const StaffPage: React.FC = () => {
     if (!isSuperAdmin && userBranchId) {
       return staffList.filter(s => s.branchId === userBranchId || s.branch?.id === userBranchId);
     }
+    if (!isSuperAdmin && userPartnerId) {
+      return staffList.filter(s => s.partnerId === userPartnerId);
+    }
     return staffList;
-  }, [staffList, isSuperAdmin, userBranchId]);
+  }, [staffList, isSuperAdmin, userBranchId, userPartnerId]);
 
   const filteredStaff = useMemo(() => {
     return baseStaffList.filter(s => {
       if (deptFilter !== 'ALL' && s.department !== deptFilter) return false;
-      if (branchFilter !== 'ALL' && s.branchId !== branchFilter) return false;
+            if (branchFilter !== 'ALL') {
+        const parts = branchFilter.split(':');
+        if (parts[0] === 'BRANCH' && s.branchId !== parts[1]) return false;
+        if (parts[0] === 'PARTNER' && s.partnerId !== parts[1]) return false;
+      }
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
@@ -326,6 +351,7 @@ export const StaffPage: React.FC = () => {
           s.designation?.toLowerCase().includes(q) ||
           s.department?.toLowerCase().includes(q) ||
           s.branch?.name.toLowerCase().includes(q) ||
+          s.pathologyPartner?.labName.toLowerCase().includes(q) ||
           (s.role as any)?.name?.toLowerCase()?.includes(q)
         );
       }
@@ -412,7 +438,7 @@ export const StaffPage: React.FC = () => {
           >
             <option value="ALL">All Branches / Locations</option>
             {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
+              <option key={`${b.type}:${b.id}`} value={`${b.type}:${b.id}`}>{b.name} ({b.city})</option>
             ))}
           </select>
         </div>
@@ -503,6 +529,11 @@ export const StaffPage: React.FC = () => {
                       <div className="flex items-center gap-1.5 text-foreground font-medium">
                         <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                         <span>{s.branch.name}</span>
+                      </div>
+                    ) : s.pathologyPartner?.labName ? (
+                      <div className="flex items-center gap-1.5 text-foreground font-medium">
+                        <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>{s.pathologyPartner.labName}</span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-[11px]">All Branches / Central</span>
@@ -717,14 +748,14 @@ export const StaffPage: React.FC = () => {
                   <select
                     value={formBranchId}
                     onChange={e => setFormBranchId(e.target.value)}
-                    disabled={!isSuperAdmin && !!userBranchId}
-                    className={`w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 ${!isSuperAdmin && !!userBranchId ? 'opacity-80 cursor-not-allowed bg-muted' : ''}`}
+                    disabled={!isSuperAdmin && (!!userBranchId || !!userPartnerId)}
+                    className={`w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 ${!isSuperAdmin && (!!userBranchId || !!userPartnerId) ? 'opacity-80 cursor-not-allowed bg-muted' : ''}`}
                   >
                     {isSuperAdmin && <option value="">All Branches / Central</option>}
                     {branches
-                      .filter(b => isSuperAdmin || !userBranchId || b.id === userBranchId)
+                      .filter(b => isSuperAdmin || (!userBranchId && !userPartnerId) || (b.type === 'BRANCH' && b.id === userBranchId) || (b.type === 'PARTNER' && b.id === userPartnerId))
                       .map(b => (
-                        <option key={b.id} value={b.id}>{b.name} ({b.city})</option>
+                        <option key={`${b.type}:${b.id}`} value={`${b.type}:${b.id}`}>{b.name} ({b.city})</option>
                       ))}
                   </select>
                 </div>

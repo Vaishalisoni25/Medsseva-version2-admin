@@ -753,8 +753,8 @@ export const PathologyPartnersPage: React.FC = () => {
 
             <div className="flex items-center gap-3">
               <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 rounded-xl px-4 py-2 text-center">
-                <div className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Commission Rate</div>
-                <div className="text-lg font-black text-emerald-800 dark:text-emerald-200">{portalData?.summary?.commissionRate ?? 30}%</div>
+                <div className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">Lab Code</div>
+                <div className="text-lg font-black text-emerald-800 dark:text-emerald-200">{portalData?.partner?.partnerCode || 'PART-201'}</div>
               </div>
               <div className="bg-teal-50 dark:bg-teal-950/40 border border-teal-200/80 rounded-xl px-4 py-2 text-center">
                 <div className="text-[10px] font-bold uppercase text-teal-700 dark:text-teal-300">Payment Cycle</div>
@@ -763,8 +763,8 @@ export const PathologyPartnersPage: React.FC = () => {
             </div>
           </div>
 
-          {/* 4 KPI Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
               <div className="flex items-center justify-between text-muted-foreground mb-2">
                 <span className="text-xs font-bold uppercase tracking-wider">Processed Samples</span>
@@ -783,14 +783,6 @@ export const PathologyPartnersPage: React.FC = () => {
               <div className="text-xs text-muted-foreground mt-0.5">Total Lab Collections</div>
             </div>
 
-            <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between text-emerald-600 mb-2">
-                <span className="text-xs font-bold uppercase tracking-wider">Calculated Commission</span>
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="text-2xl font-black text-emerald-600">₹{portalData?.summary?.totalCommissionEarned?.toLocaleString('en-IN') ?? 0}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Calculated @ {portalData?.summary?.commissionRate ?? 30}%</div>
-            </div>
 
             <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
               <div className="flex items-center justify-between text-muted-foreground mb-2">
@@ -829,7 +821,7 @@ export const PathologyPartnersPage: React.FC = () => {
                     <th className="py-3 px-4">Patient Name</th>
                     <th className="py-3 px-4">Investigated Tests</th>
                     <th className="py-3 px-4 text-right">Billed Amount</th>
-                    <th className="py-3 px-4 text-right">Commission ({portalData?.summary?.commissionRate ?? 30}%)</th>
+
                     <th className="py-3 px-4 text-center">Payout Status</th>
                     <th className="py-3 px-4 text-center">Lab Report</th>
                   </tr>
@@ -880,9 +872,7 @@ export const PathologyPartnersPage: React.FC = () => {
                           ₹{item.totalPaid?.toLocaleString('en-IN')}
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-bold text-emerald-600 font-mono">
-                          +₹{item.commissionAmount?.toLocaleString('en-IN')}
-                        </td>
+
 
                         <td className="py-3.5 px-4 text-center">
                           <button
@@ -1056,7 +1046,7 @@ export const PathologyPartnersPage: React.FC = () => {
                     <th className="px-6 py-4 font-bold">Contact</th>
                     <th className="px-6 py-4 font-bold">Rating</th>
                     <th className="px-6 py-4 font-bold">Status</th>
-                    <th className="px-6 py-4 font-bold text-center">Commission Rate</th>
+
                     <th className="px-6 py-4 font-bold text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1156,11 +1146,7 @@ export const PathologyPartnersPage: React.FC = () => {
                             {cfg.label}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs font-black font-mono shadow-2xs">
-                            <Percent className="w-3.5 h-3.5" /> {partner.commissionRate ?? 30}%
-                          </span>
-                        </td>
+
                         <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
                             <button
@@ -1520,11 +1506,7 @@ export const PathologyPartnersPage: React.FC = () => {
                 {/* Section 4: Performance & Commission Summary */}
                 <div className="bg-muted/40 p-4 rounded-xl border border-border space-y-3">
                   <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Referral & Commission Details</h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="bg-card p-3 rounded-lg border border-border">
-                      <span className="text-muted-foreground block text-[10px] font-bold uppercase">Commission Rate</span>
-                      <span className="text-lg font-black text-emerald-600">{selectedPartner.commissionRate ?? 30}%</span>
-                    </div>
+                  <div className="grid grid-cols-1 gap-3 text-xs">
                     <div className="bg-card p-3 rounded-lg border border-border">
                       <span className="text-muted-foreground block text-[10px] font-bold uppercase">Payment Cycle</span>
                       <span className="text-base font-bold text-foreground">{selectedPartner.paymentCycle || 'MONTHLY'}</span>
@@ -1725,55 +1707,15 @@ export const PathologyPartnersPage: React.FC = () => {
                     />
                   </div>
 
-                  {/* Commission Rate (%) Section */}
+                  {/* Payment Cycle Section */}
                   <div className="md:col-span-2 p-4 bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Percent className="w-3.5 h-3.5" /> Referral Commission Rate & Payout
+                        <DollarSign className="w-3.5 h-3.5" /> Payment & Payout Cycle
                       </label>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
-                        {formCommissionRate}% Payout Rate
-                      </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-muted-foreground mb-1">
-                          Commission Rate (%)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.5"
-                            placeholder="30"
-                            value={formCommissionRate}
-                            onChange={e => setFormCommissionRate(Number(e.target.value))}
-                            className="w-full pl-3.5 pr-8 py-2 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-background text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">%</span>
-                        </div>
-                        {/* Quick preset buttons */}
-                        <div className="flex items-center gap-1.5 mt-2">
-                          {[15, 20, 25, 30, 40, 50].map(pct => (
-                            <button
-                              key={pct}
-                              type="button"
-                              onClick={() => setFormCommissionRate(pct)}
-                              className={cn(
-                                "px-2 py-0.5 rounded text-[10px] font-bold transition-all",
-                                formCommissionRate === pct
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-background border border-emerald-200 hover:bg-emerald-100/50 text-emerald-800 dark:text-emerald-300"
-                              )}
-                            >
-                              {pct}%
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
                       <div>
                         <label className="block text-[11px] font-bold text-muted-foreground mb-1">
                           Payment & Payout Cycle

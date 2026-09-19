@@ -116,9 +116,11 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
       ? rawPatientName
       : (rawPatientName ? `${booking?.patientGender === 'Female' ? 'Ms.' : 'Mr.'} ${rawPatientName}` : '-');
 
-  const refDoctor = booking?.partnerNote?.startsWith('Ref:')
-    ? booking.partnerNote.replace('Ref:', '').trim()
-    : (doctor?.name || report?.doctorName || 'Self');
+  const refDoctor = booking?.referringDoctor?.name
+    ? `Dr. ${booking.referringDoctor.name}`
+    : booking?.partnerNote?.startsWith('Ref:')
+      ? booking.partnerNote.replace('Ref:', '').trim()
+      : (doctor?.name || report?.doctorName || 'Self');
 
   const regCode = booking?.bookingCode || report?.id?.slice(0, 8) || '1042';
 
