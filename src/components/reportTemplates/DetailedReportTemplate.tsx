@@ -40,7 +40,7 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
       : (rawPatientName ? `${patientTitle} ${rawPatientName}` : '-');
 
   const refDoctor = booking?.referringDoctor?.name
-    ? `Dr. ${booking.referringDoctor.name}`
+    ? `Dr. ${booking.referringDoctor.name}${booking.referringDoctor.qualification ? ` - ${booking.referringDoctor.qualification}` : ''}${booking.referringDoctor.designation ? `, ${booking.referringDoctor.designation}` : ''}`
     : booking?.partnerNote?.startsWith('Ref:')
       ? booking.partnerNote.replace('Ref:', '').trim()
       : (doctor?.name || report?.doctorName || 'Self');

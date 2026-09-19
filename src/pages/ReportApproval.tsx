@@ -292,8 +292,8 @@ export const ReportApprovalPage: React.FC = () => {
       setGeneratingPDF(false);
     }
   }, [selectedReport, approvalTemplate, generateAndDownloadPDF, dispatch]);
-  const draftReports = reports.filter((r: any) => r.status === 'DRAFT' || r.status === 'UNDER_REVIEW');
-  const approvedReports = reports.filter((r: any) => r.status === 'APPROVED' || r.status === 'RELEASED');
+  const draftReports = reports.filter((r: any) => r.status === 'DRAFT' || r.status === 'PENDING_VERIFICATION');
+  const approvedReports = reports.filter((r: any) => r.status === 'VERIFIED' || r.status === 'PUBLISHED');
 
 const handleFinalize = async () => {
     if (!selectedReport) return;
@@ -367,10 +367,10 @@ const handleFinalize = async () => {
 
   const getStatusBadge = (status: string) => {
     const map: Record<string, { label: string; className: string }> = {
-      DRAFT: { label: 'Draft', className: 'bg-slate-100 text-slate-600 border-slate-200' },
-      UNDER_REVIEW: { label: 'Under Review', className: 'bg-amber-50 text-amber-700 border-amber-100' },
-      APPROVED: { label: 'Approved', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
-      RELEASED: { label: 'Released', className: 'bg-blue-50 text-blue-700 border-blue-100' },
+      DRAFT: { label: 'Draft', className: 'bg-slate-100 text-slate-700 border-slate-200' },
+      PENDING_VERIFICATION: { label: 'Under Review', className: 'bg-amber-50 text-amber-700 border-amber-100' },
+      VERIFIED: { label: 'Approved', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+      PUBLISHED: { label: 'Released', className: 'bg-blue-50 text-blue-700 border-blue-100' },
     };
     const s = map[status] || { label: status, className: 'bg-muted text-muted-foreground' };
     return <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded border uppercase", s.className)}>{s.label}</span>;
@@ -586,7 +586,7 @@ const handleFinalize = async () => {
                       <Printer className="h-3.5 w-3.5" />
                       {generatingPDF ? 'Generating...' : uploadingPDF ? 'Uploading PDF...' : selectedReport?.pdfUrl ? 'Download PDF' : 'Generate & Download'}
                     </button>
-                    {(selectedReport.status === 'DRAFT' || selectedReport.status === 'UNDER_REVIEW') && (
+                    {(selectedReport.status === 'DRAFT' || selectedReport.status === 'PENDING_VERIFICATION') && (
                       canApproveReport(selectedReport) ? (
                         <button
                           onClick={() => setShowFinalizeConfirm(true)}
@@ -603,7 +603,7 @@ const handleFinalize = async () => {
                         </div>
                       )
                     )}
-                    {selectedReport.status === 'APPROVED' && (
+                    {selectedReport.status === 'VERIFIED' && (
                       <button
                         onClick={() => setShowSendModal(true)}
                         disabled={sending}
@@ -612,7 +612,7 @@ const handleFinalize = async () => {
                         <Send className="h-3.5 w-3.5" /> {sending ? 'Publishing Report...' : 'Send Report'}
                       </button>
                     )}
-                    {selectedReport.status === 'RELEASED' && (
+                    {selectedReport.status === 'PUBLISHED' && (
                       <button
                         onClick={() => setShowResendConfirm(true)}
                         className="flex items-center gap-1 text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 px-2 py-1 rounded transition-colors"

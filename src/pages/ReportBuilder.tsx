@@ -473,9 +473,15 @@ export const ReportBuilderPage: React.FC = () => {
       return;
     }
 
-    doctorService.getDoctors({ branchId }).then(res => {
+    const selectedBranch = branches.find(b => b.id === branchId);
+    const isPartner = (selectedBranch as any)?.isPartnerLab;
+    const query = isPartner ? { partnerId: branchId } : { branchId };
+
+    doctorService.getDoctors(query).then(res => {
       const docs = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
-      const branchDocs = docs.filter((d: any) => d.branchId === branchId || d.branch?.id === branchId);
+      const branchDocs = docs.filter((d: any) => 
+        isPartner ? d.partnerId === branchId : (d.branchId === branchId || d.branch?.id === branchId)
+      );
       setAvailableDoctors(branchDocs);
 
       if (isReportCreated) return;
@@ -515,13 +521,31 @@ export const ReportBuilderPage: React.FC = () => {
       return;
     }
 
-    staffService.getStaff({ branchId }).then(res => {
+    const selectedBranch = branches.find(b => b.id === branchId);
+    const isPartner = (selectedBranch as any)?.isPartnerLab;
+    const query = isPartner ? { partnerId: branchId } : { branchId };
+
+    staffService.getStaff(query).then(res => {
       const allStaff = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
       const branchTechs = allStaff.filter((s: any) => {
-        const matchesBranch = !s.branchId || s.branchId === branchId || s.branch?.id === branchId;
+        const matchesBranch = isPartner ? s.partnerId === branchId : (!s.branchId || s.branchId === branchId || s.branch?.id === branchId);
         const text = `${s.designation || ''} ${s.department || ''} ${s.role?.name || ''} ${s.role?.slug || ''}`.toLowerCase();
         return matchesBranch && /technician|technologist|lab|pathology/i.test(text);
       });
+      
+      // If it's a partner lab, add the partner themselves as a technician
+      if (isPartner && selectedBranch) {
+        branchTechs.unshift({
+          id: `partner_${selectedBranch.id}`,
+          name: selectedBranch.name,
+          designation: 'Lab Owner / Incharge',
+          qualification: 'Pathology Partner',
+          user: {
+            name: selectedBranch.name
+          }
+        });
+      }
+      
       setAvailableTechnicians(branchTechs);
 
       if (isReportCreated) return;
