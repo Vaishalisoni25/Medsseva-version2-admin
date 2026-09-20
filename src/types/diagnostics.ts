@@ -6,7 +6,8 @@ export type TestCategory =
   | 'Liver' 
   | 'Vitamins' 
   | 'Fever'
-  | 'General';
+  | 'General'
+  | 'Full Body';
 
 export interface ReferenceRange {
   gender: 'MALE' | 'FEMALE' | 'ANY';

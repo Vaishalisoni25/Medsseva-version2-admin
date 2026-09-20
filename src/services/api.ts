@@ -452,6 +452,7 @@ export interface SystemSettings {
   maintenanceMode: boolean;
   allowBookings: boolean;
   allowPartnerRegistration: boolean;
+  referralRewardAmount: number;
   updatedBy: string | null;
   updatedAt: string;
   createdAt: string;

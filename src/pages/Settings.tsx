@@ -19,6 +19,7 @@ interface FormState {
   labOpenTime: string;
   labCloseTime: string;
   reportDeliveryMode: ReportDeliveryMode;
+  referralRewardAmount: string;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -28,6 +29,7 @@ const DEFAULT_FORM: FormState = {
   labOpenTime: '',
   labCloseTime: '',
   reportDeliveryMode: 'AUTO_PUSH',
+  referralRewardAmount: '',
 };
 
 export const SettingsPage: React.FC = () => {
@@ -60,6 +62,7 @@ export const SettingsPage: React.FC = () => {
         labOpenTime: data.labOpenTime,
         labCloseTime: data.labCloseTime,
         reportDeliveryMode: data.reportDeliveryMode,
+        referralRewardAmount: String(data.referralRewardAmount ?? 100),
       });
     } catch (e: any) {
       const status = e?.response?.status;
@@ -80,10 +83,12 @@ export const SettingsPage: React.FC = () => {
     const min = parseFloat(form.minimumHomeCollectionAmount);
     const charge = parseFloat(form.homeCollectionCharge);
     const comm = parseFloat(form.defaultPartnerCommission);
+    const reward = parseFloat(form.referralRewardAmount);
 
     if (isNaN(min) || min < 0) return 'Minimum home collection amount cannot be negative.';
     if (isNaN(charge) || charge < 0) return 'Home collection charge cannot be negative.';
     if (isNaN(comm) || comm < 0 || comm > 100) return 'Commission must be between 0 and 100.';
+    if (isNaN(reward) || reward < 0) return 'Referral reward amount cannot be negative.';
     if (!form.labOpenTime || !form.labCloseTime) return 'Lab operating hours are required.';
     if (form.labOpenTime >= form.labCloseTime) return 'Opening time must be before closing time.';
     return null;
@@ -105,6 +110,7 @@ export const SettingsPage: React.FC = () => {
         labOpenTime: form.labOpenTime,
         labCloseTime: form.labCloseTime,
         reportDeliveryMode: form.reportDeliveryMode,
+        referralRewardAmount: parseFloat(form.referralRewardAmount),
       };
       const updated = await settingsService.updateSettings(payload);
       setSettings(updated);
@@ -250,6 +256,22 @@ export const SettingsPage: React.FC = () => {
                     <option value="AUTO_PUSH">Direct Auto-Push on Approval</option>
                     <option value="MANUAL_DISPATCH">Hold until manual Franchise dispatch</option>
                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-foreground">Referral Reward Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                    <input
+                      type="number"
+                      className="w-full pl-7 p-2 border border-input text-sm font-bold rounded bg-background disabled:opacity-60"
+                      value={form.referralRewardAmount}
+                      onChange={setField('referralRewardAmount')}
+                      min={0}
+                      disabled={!isSuperAdmin}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Amount credited to referrer's wallet upon successful sign-up.</p>
                 </div>
               </div>
 

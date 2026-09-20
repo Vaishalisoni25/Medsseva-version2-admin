@@ -22,7 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/utils/cn';
 
-const CATEGORIES: TestCategory[] = ['Blood', 'Diabetes', 'Thyroid', 'Cardiac', 'Liver', 'Vitamins', 'Fever', 'General'];
+const CATEGORIES: TestCategory[] = ['Blood', 'Diabetes', 'Thyroid', 'Cardiac', 'Liver', 'Vitamins', 'Fever', 'General', 'Full Body'];
 
 export const TestCatalogPage: React.FC = () => {
 const { tests, status, error } = useAppSelector(state => state.tests);
