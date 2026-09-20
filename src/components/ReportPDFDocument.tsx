@@ -89,7 +89,14 @@ export const ReportPDFDocument: React.FC<ReportPDFDocumentProps> = ({
     collectionMode: rawBooking.collectionMode || report.collectionMode || 'LAB',
     sampleCollectedAt: rawBooking.sampleCollectedAt || report.sampleCollectedAt || report.reportedDate || null,
     sampleReceivedAt: rawBooking.sampleReceivedAt || report.sampleReceivedAt || report.reportedDate || null,
-    branch: rawBranch || rawBooking.branch || report.reportBranch || null,
+    branch: rawBranch || report.reportBranch || (report.internalNotes?.includes('[BRANCH:') ? (() => {
+      try {
+        const m = report.internalNotes.match(/\[BRANCH:(\{.*?\})\]/);
+        if (m && m[1]) return JSON.parse(m[1]);
+      } catch (e) {}
+      return null;
+    })() : null) || rawBooking.branch || null,
+    referringDoctor: rawBooking.referringDoctor || report.booking?.referringDoctor || report.referringDoctor || null,
   };
 
   const doctor = rawDoctor
@@ -314,7 +321,7 @@ export const ReportPDFDocument: React.FC<ReportPDFDocumentProps> = ({
   const templateProps: TemplateProps = {
     report,
     booking,
-    branch: rawBranch || booking.branch,
+    branch: rawBranch || booking.branch || report.reportBranch,
     doctor,
     technician,
     groupedParams,

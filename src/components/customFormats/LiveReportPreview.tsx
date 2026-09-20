@@ -194,7 +194,13 @@ export const LiveReportPreview: React.FC<LiveReportPreviewProps> = ({
     mobile: typeof patientData?.patientMobile === 'string' ? patientData.patientMobile : '+91 98765 43210',
     email: typeof patientData?.patientEmail === 'string' ? patientData.patientEmail : 'rajesh.verma@example.com',
     address: formatAddress(patientData?.address) || 'H.No 412, Sector 14, Urban Estate, Gurugram, Haryana - 122001',
-    refDoctor: typeof patientData?.doctorName === 'string' ? patientData.doctorName : 'Dr. Aditya Tayal (MD, Pathology)',
+    refDoctor: patientData?.referringDoctor?.name
+      ? `Dr. ${patientData.referringDoctor.name.replace(/^dr\.?\s*/i, '')}`
+      : (patientData?.referringDoctorName
+        ? `Dr. ${patientData.referringDoctorName.replace(/^dr\.?\s*/i, '')}`
+        : (typeof patientData?.refDoctor === 'string'
+          ? patientData.refDoctor
+          : 'Self')),
     sampleId: typeof patientData?.sampleId === 'string' ? patientData.sampleId : 'SMP-849201',
     bookingCode: typeof patientData?.bookingCode === 'string' ? patientData.bookingCode : 'MEDS-88219',
     collectionDate: typeof patientData?.collectionDate === 'string' ? patientData.collectionDate : '12/03/2026 08:30 AM',

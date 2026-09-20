@@ -35,6 +35,7 @@ import { cn } from '../utils/cn';
 import { ReportPDFDocument, DoctorDetails } from '../components/ReportPDFDocument';
 import { useToast } from '../components/Toast';
 import { customFormatService } from '../services/customFormat.service';
+import { branchService } from '../services/branch.service';
 import { CustomReportTemplate } from '../types/customFormat';
 import { sanitizeClonedDocForPdf } from '@/utils/exportInvoicePdf';
 
@@ -94,10 +95,19 @@ export const ReportApprovalPage: React.FC = () => {
     sms: true,
     whatsapp: true,
   });
+  const [allBranches, setAllBranches] = useState<any[]>([]);
   const toast = useToast();
 
   useReportsQuery();
   useBookingsForReportQuery();
+
+  React.useEffect(() => {
+    branchService.getAll().then(res => {
+      if (res?.data && Array.isArray(res.data)) {
+        setAllBranches(res.data);
+      }
+    }).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     customFormatService.getReportTemplates()
@@ -130,7 +140,22 @@ export const ReportApprovalPage: React.FC = () => {
   }, [selectedReport?.id, customReportTemplates]);
 
   const buildBranchAndDoctor = useCallback(() => {
-    const rb = selectedReport?.reportBranch || null;
+    let rb = selectedReport?.reportBranch || null;
+    if (!rb && selectedReport?.internalNotes?.includes('[BRANCH:')) {
+      try {
+        const m = selectedReport.internalNotes.match(/\[BRANCH:(\{.*?\})\]/);
+        if (m && m[1]) rb = JSON.parse(m[1]);
+      } catch (e) {}
+    }
+    let targetBranchId = selectedReport?.reportBranchId;
+    if (!targetBranchId && selectedReport?.internalNotes?.includes('[BRANCH_ID:')) {
+      const m = selectedReport.internalNotes.match(/\[BRANCH_ID:([^\]]+)\]/);
+      if (m && m[1]) targetBranchId = m[1].trim();
+    }
+    if (!rb && targetBranchId && allBranches.length > 0) {
+      rb = allBranches.find((b: any) => b.id === targetBranchId) || null;
+    }
+
     const branch = rb ? {
       ...rb,
       name: rb.name || '',
@@ -170,7 +195,7 @@ export const ReportApprovalPage: React.FC = () => {
     } : undefined;
 
     return { branch, doctor, technician };
-  }, [selectedReport]);
+  }, [selectedReport, allBranches]);
 
   const generateAndDownloadPDF = useCallback(async (reportData: any, templateType: 'STANDARD' | 'DETAILED') => {
     try {

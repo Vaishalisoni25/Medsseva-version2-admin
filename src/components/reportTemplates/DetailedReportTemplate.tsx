@@ -12,15 +12,31 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
   formatDateTime,
   getFlag,
 }) => {
-  const effectiveBranch = branch || report?.reportBranch || booking?.branch || null;
+  let effectiveBranch = branch || report?.reportBranch || null;
+  if (!effectiveBranch && report?.internalNotes?.includes('[BRANCH:')) {
+    try {
+      const m = report.internalNotes.match(/\[BRANCH:(\{.*?\})\]/);
+      if (m && m[1]) effectiveBranch = JSON.parse(m[1]);
+    } catch (e) {}
+  }
+  if (!effectiveBranch) {
+    effectiveBranch = booking?.branch || null;
+  }
+
   const branchName = effectiveBranch?.name || report?.branchName || 'LPL - MedsSeva Diagnostics';
-  const branchAddr = [
-    effectiveBranch?.line1,
-    effectiveBranch?.city,
-    effectiveBranch?.state,
-    effectiveBranch?.pincode ? `- ${effectiveBranch.pincode}` : '',
-  ].filter(Boolean).join(', ') || 'Central Diagnostic Reference Laboratory';
-  const branchPhone = effectiveBranch?.contactNumber || '+91 8968522455';
+  let branchAddr = effectiveBranch?.line1 || '';
+  if (effectiveBranch?.city && !branchAddr.toLowerCase().includes(effectiveBranch.city.toLowerCase())) {
+    branchAddr = branchAddr ? `${branchAddr}, ${effectiveBranch.city}` : effectiveBranch.city;
+  }
+  if (effectiveBranch?.state && !branchAddr.toLowerCase().includes(effectiveBranch.state.toLowerCase())) {
+    branchAddr = branchAddr ? `${branchAddr}, ${effectiveBranch.state}` : effectiveBranch.state;
+  }
+  if (effectiveBranch?.pincode && !branchAddr.includes(String(effectiveBranch.pincode))) {
+    branchAddr = branchAddr ? `${branchAddr} - ${effectiveBranch.pincode}` : `${effectiveBranch.pincode}`;
+  }
+  if (!branchAddr) branchAddr = 'Central Diagnostic Reference Laboratory';
+
+  const branchPhone = effectiveBranch?.contactNumber || effectiveBranch?.phone || '+91 8968522455';
   const branchEmail = effectiveBranch?.email || 'customer.care@medsseva.com';
   const branchLabRegNo = effectiveBranch?.labRegNo || '';
 
@@ -39,13 +55,22 @@ export const DetailedReportTemplate: React.FC<TemplateProps> = ({
       ? rawPatientName
       : (rawPatientName ? `${patientTitle} ${rawPatientName}` : '-');
 
-  const refDoctor = booking?.referringDoctor?.name
-    ? `Dr. ${booking.referringDoctor.name}${booking.referringDoctor.qualification ? ` - ${booking.referringDoctor.qualification}` : ''}${booking.referringDoctor.designation ? `, ${booking.referringDoctor.designation}` : ''}`
-    : booking?.assignedPartner?.user?.name
-      ? `Dr. ${booking.assignedPartner.user.name}`
-      : booking?.partnerNote?.startsWith('Ref:')
-        ? booking.partnerNote.replace('Ref:', '').trim()
-        : (doctor?.name || report?.doctorName || 'Self');
+  const referringDoc = booking?.referringDoctor || report?.booking?.referringDoctor || (report as any)?.referringDoctor;
+  const rawRefDoctorName = referringDoc?.name || (booking as any)?.referringDoctorName || (report as any)?.referringDoctorName;
+  const partnerNote = booking?.partnerNote || (booking as any)?.notes || report?.internalNotes || '';
+
+  let refDoctor = 'Self';
+  if (rawRefDoctorName) {
+    const cleanDocName = rawRefDoctorName.replace(/^dr\.?\s*/i, '').trim();
+    refDoctor = `Dr. ${cleanDocName}`;
+  } else if (booking?.assignedPartner?.user?.name) {
+    refDoctor = `Dr. ${booking.assignedPartner.user.name.replace(/^dr\.?\s*/i, '')}`;
+  } else if (partnerNote) {
+    const m = partnerNote.match(/(?:Ref(?:erred)?\s*(?:by)?|Doctor)\s*:\s*(?:Dr\.?\s*)?([A-Za-z\s]+)/i);
+    if (m && m[1] && m[1].trim() && !/direct|clinic|handover|pickup|request/i.test(m[1].trim())) {
+      refDoctor = `Dr. ${m[1].trim().replace(/^dr\.?\s*/i, '')}`;
+    }
+  }
 
   const labNo = booking?.bookingCode || report?.id?.slice(0, 9) || '494874897';
 
