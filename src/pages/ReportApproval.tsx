@@ -906,7 +906,13 @@ const handleFinalize = async () => {
                   const patientMobile = item.mobile || selectedBooking?.patientMobile || selectedBooking?.user?.mobile || '';
                   const cleanMobile = patientMobile.replace(/[^0-9]/g, '');
                   const waNumber = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-                  const waMessage = `Hello *${item.name}*,\n\nYour official diagnostic lab report from *MedsSeva Diagnostics* (${selectedReport?.booking?.bookingCode || selectedReport?.id?.slice(0, 8)}) is ready.\n\n🔗 *Verify & View Report:* ${window.location.origin}/verify-report/${selectedReport?.id}\n\n_Thank you for choosing MedsSeva._`;
+                  const baseUrl = window.location.hostname === 'localhost' ? 'https://medsseva-version2-admin.vercel.app' : window.location.origin;
+                  const verifyLink = `${baseUrl}/verify-report/${selectedReport?.id}`;
+                  const pdfDownloadLink = selectedReport?.pdfUrl ? `\n\n📄 *Download Original Signed PDF:*\n${selectedReport.pdfUrl}` : '';
+                  const bookingRef = selectedReport?.booking?.bookingCode || selectedReport?.id?.slice(0, 8);
+                  const testTitle = selectedReport?.testName || selectedReport?.booking?.tests?.[0]?.test?.name || 'Diagnostic Pathology';
+
+                  const waMessage = `🏥 *MEDSSEVA DIAGNOSTICS & RESEARCH CENTRE*\n_ISO 15189 & NABL Accredited Laboratory Network_\n━━━━━━━━━━━━━━━━━━━━━━\nDear *${item.name}*,\n\nYour official diagnostic test report has been certified by our clinical pathology department.\n\n📋 *Booking ID:* ${bookingRef}\n🧪 *Investigation:* ${testTitle}\n👨‍⚕️ *Consultant Pathologist:* ${selectedReport?.doctorName || 'Dr. Aditya Tayal'}\n━━━━━━━━━━━━━━━━━━━━━━\n🔗 *View Digital Report:*\n${verifyLink}${pdfDownloadLink}\n━━━━━━━━━━━━━━━━━━━━━━\n_MedsSeva - Smart Diagnostics. Better Care._\n_Support: medssevaofficial@gmail.com_`;
                   const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(waMessage)}`;
 
                   return (
