@@ -45,6 +45,7 @@ import { exportInvoiceToPdf } from '../utils/exportInvoicePdf';
 const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string; border: string }> = {
   'Pending': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
   'Confirmed': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+  'Doctor Reference': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
   'Assigned': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
   'Collected': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
   'Received': { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
@@ -57,7 +58,7 @@ const STATUS_COLORS: Record<BookingStatus, { bg: string; text: string; border: s
   'Sample Rejected': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
 };
 
-const ALL_STATUSES: BookingStatus[] = ['Pending', 'Confirmed', 'Assigned', 'Collected', 'Processing', 'Completed'];
+const ALL_STATUSES: BookingStatus[] = ['Pending', 'Confirmed', 'Doctor Reference', 'Assigned', 'Collected', 'Processing', 'Completed'];
 
 export const BookingsPage: React.FC = () => {
  const dispatch = useAppDispatch();
@@ -233,6 +234,20 @@ const handleAcceptLabBooking = async () => {
       toast.success('Lab visit booking accepted.');
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Failed to accept booking.');
+    }
+    setIsLabActioning(false);
+  };
+
+  const handleAcceptDispatch = async () => {
+    if (!selectedBooking) return;
+    setIsLabActioning(true);
+    try {
+      await testService.acceptDispatchBooking(selectedBooking.id);
+      dispatch(updateBookingStatusAsync({ id: selectedBooking.id, status: 'Processing' }));
+      setSelectedBooking({ ...selectedBooking, status: 'Processing' });
+      toast.success('Doctor Dispatch accepted. Moving to Processing.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to accept dispatch.');
     }
     setIsLabActioning(false);
   };
@@ -735,6 +750,57 @@ const getStaffName = (id?: string) => {
                       )
                     )}
              
+            {(selectedBooking as any).rawStatus === 'DELIVERED_TO_LAB' && (selectedBooking as any).collectionMode === 'LAB' && (
+              <div className="w-full space-y-2 mt-4">
+                <div className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-3 py-2">
+                  Sample dispatched directly by Doctor. Awaiting Lab acceptance.
+                </div>
+                {!showRejectInput ? (
+                  <div className="flex gap-2">
+                    <button
+                      disabled={isLabActioning}
+                      onClick={handleAcceptDispatch}
+                      className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <Check className="h-3.5 w-3.5" /> Accept Dispatch & Process
+                    </button>
+                    <button
+                      disabled={isLabActioning}
+                      onClick={() => setShowRejectInput(true)}
+                      className="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-bold hover:bg-rose-700 flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <XCircle className="h-3.5 w-3.5" /> Reject
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Rejection reason (required)"
+                      value={rejectReason}
+                      onChange={e => setRejectReason(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-rose-300 rounded text-xs outline-none focus:ring-2 focus:ring-rose-200"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        disabled={isLabActioning || !rejectReason.trim()}
+                        onClick={handleRejectLabBooking}
+                        className="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-bold hover:bg-rose-700 disabled:opacity-50"
+                      >
+                        {isLabActioning ? 'Rejecting...' : 'Confirm Reject'}
+                      </button>
+                      <button
+                        onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+                        className="px-3 py-1.5 bg-muted text-foreground rounded text-xs font-bold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
            {(selectedBooking as any).paymentStatus !== 'SUCCESS' &&
                       (selectedBooking as any).collectionMode === 'HOME' &&
                       selectedBooking.status !== 'Cancelled' &&

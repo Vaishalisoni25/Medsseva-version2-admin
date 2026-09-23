@@ -57,6 +57,7 @@ export interface MedicalPackage {
 export type BookingStatus = 
   | 'Pending' 
   | 'Confirmed' 
+  | 'Doctor Reference'
   | 'Assigned' 
   | 'Collected' 
   | 'Received' 

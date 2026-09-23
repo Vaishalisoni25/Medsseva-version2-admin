@@ -243,6 +243,10 @@ initiateRazorpayCheckout: async (id: string) => {
     const response = await api.patch(`/bookings/${id}/accept-lab`);
     return response.data;
   },
+  acceptDispatchBooking: async (id: string) => {
+    const response = await api.patch(`/bookings/${id}/accept-dispatch`);
+    return response.data;
+  },
 rejectLabBooking: async (id: string, reason: string) => {
     const response = await api.patch(`/bookings/${id}/reject-lab`, { reason });
     return response.data;
