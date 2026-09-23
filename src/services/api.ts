@@ -183,7 +183,7 @@ export const testService = {
     const response = await api.get('/tests');
     return response.data;
   },
-createTest: async (data: any) => {
+  createTest: async (data: any) => {
     const response = await api.post('/tests', data);
     return response.data;
   },
@@ -207,7 +207,7 @@ createTest: async (data: any) => {
     const response = await api.patch(`/reports/${id}/verify`);
     return response.data;
   },
- getRegisteredUsers: async () => {
+  getRegisteredUsers: async () => {
     const response = await api.get('/auth/users');
     return response.data;
   },
@@ -219,7 +219,7 @@ createTest: async (data: any) => {
     const response = await api.patch(`/bookings/${id}/assign-executive`, { executiveId });
     return response.data;
   },
-getExecutives: async () => {
+  getExecutives: async () => {
     const response = await api.get('/auth/users?role=EXECUTIVE');
     return response.data;
   },
@@ -227,11 +227,11 @@ getExecutives: async () => {
     const response = await api.patch(`/bookings/${bookingId}/assign-partner`, { partnerId });
     return response.data;
   },
-updateLabStatus: async (id: string, status: string) => {
+  updateLabStatus: async (id: string, status: string) => {
     const response = await api.patch(`/bookings/${id}/update-lab-status`, { status });
     return response.data;
   },
-initiateRazorpayCheckout: async (id: string) => {
+  initiateRazorpayCheckout: async (id: string) => {
     const response = await api.post(`/bookings/${id}/payment-link`);
     return response.data;
   },
@@ -247,7 +247,7 @@ initiateRazorpayCheckout: async (id: string) => {
     const response = await api.patch(`/bookings/${id}/accept-dispatch`);
     return response.data;
   },
-rejectLabBooking: async (id: string, reason: string) => {
+  rejectLabBooking: async (id: string, reason: string) => {
     const response = await api.patch(`/bookings/${id}/reject-lab`, { reason });
     return response.data;
   },
@@ -354,7 +354,7 @@ export const financeService = {
   getPayments: (params?: { page?: number; limit?: number; status?: string; from?: string; to?: string }) =>
     api.get('/finance/payments', { params }).then(r => r.data),
   getPaymentById: (id: string) => api.get(`/finance/payments/${id}`).then(r => r.data),
-getConfig: () => api.get('/payments/config').then(r => r.data),
+  getConfig: () => api.get('/payments/config').then(r => r.data),
   createOrder: (bookingId: string) => api.post('/payments/create-order', { bookingId }).then(r => r.data),
   verifyPayment: (data: {
     razorpay_order_id: string;
@@ -367,7 +367,7 @@ getConfig: () => api.get('/payments/config').then(r => r.data),
   getRefunds: (status?: string) => api.get('/finance/refunds', { params: status ? { status } : {} }).then(r => r.data),
   requestRefund: (data: { paymentId: string; amount: number; reason: string; approvalNotes?: string }) =>
     api.post('/finance/refunds', data).then(r => r.data),
-approveRefund: (id: string) => api.post(`/finance/refunds/${id}/approve`).then(r => r.data),
+  approveRefund: (id: string) => api.post(`/finance/refunds/${id}/approve`).then(r => r.data),
   executeRefund: (paymentId: string, data: { refundType: 'FULL' | 'PARTIAL'; amount?: number; reason: string }) =>
     api.post(`/finance/payments/${paymentId}/refund`, data).then(r => r.data),
   rejectRefund: (id: string, reason: string) => api.post(`/finance/refunds/${id}/reject`, { reason }).then(r => r.data),

@@ -136,7 +136,7 @@ export const AdminUsersPage: React.FC = () => {
     setFormQualification(defaultType === 'DOCTOR' ? 'MBBS, MD (Pathology)' : '');
     setFormRegistrationNo('');
     setFormSignatureUrl('');
-    setFormCommissionRate(30);
+    setFormCommissionRate(0);
     setFormPaymentCycle('MONTHLY');
     setSelectedPerms(new Set());
     setIsCustomRole(false);
@@ -294,7 +294,7 @@ export const AdminUsersPage: React.FC = () => {
         qualification: formQualification || undefined,
         registrationNo: formRegistrationNo || undefined,
         signatureUrl: formSignatureUrl || undefined,
-        commissionRate: formCommissionRate !== undefined ? Number(formCommissionRate) : 30,
+        commissionRate: 0,
         paymentCycle: formPaymentCycle || 'MONTHLY',
       };
       if (formPassword) payload.password = formPassword;
@@ -712,33 +712,6 @@ export const AdminUsersPage: React.FC = () => {
                         className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30"
                       />
                       <p className="text-[10px] text-muted-foreground mt-1">If blank, standard digital signature stamp will be used on reports.</p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-foreground mb-1 block">Commission Rate (%) *</label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={formCommissionRate}
-                          onChange={e => setFormCommissionRate(Number(e.target.value))}
-                          placeholder="30"
-                          className="w-full h-10 pl-3 pr-8 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30 font-bold"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-700 dark:text-teal-300">%</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-foreground mb-1 block">Payment Cycle</label>
-                      <select
-                        value={formPaymentCycle}
-                        onChange={e => setFormPaymentCycle(e.target.value)}
-                        className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30 font-medium"
-                      >
-                        <option value="MONTHLY">Monthly</option>
-                        <option value="15_DAYS">15 Days (Fortnightly)</option>
-                        <option value="WEEKLY">Weekly (7 Days)</option>
-                      </select>
                     </div>
                   </div>
                 </div>

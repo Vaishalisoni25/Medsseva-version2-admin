@@ -136,15 +136,13 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
   const rawRefDoctorName = referringDoc?.name || (booking as any)?.referringDoctorName || (report as any)?.referringDoctorName;
   const partnerNote = booking?.partnerNote || (booking as any)?.notes || report?.internalNotes || '';
 
-  let refDoctor = 'Self';
+  let refDoctor: string | null = null;
   if (rawRefDoctorName) {
     const cleanDocName = rawRefDoctorName.replace(/^dr\.?\s*/i, '').trim();
     refDoctor = `Dr. ${cleanDocName}`;
-  } else if (booking?.assignedPartner?.user?.name) {
-    refDoctor = `Dr. ${booking.assignedPartner.user.name.replace(/^dr\.?\s*/i, '')}`;
   } else if (partnerNote) {
     const m = partnerNote.match(/(?:Ref(?:erred)?\s*(?:by)?|Doctor)\s*:\s*(?:Dr\.?\s*)?([A-Za-z\s]+)/i);
-    if (m && m[1] && m[1].trim() && !/direct|clinic|handover|pickup|request/i.test(m[1].trim())) {
+    if (m && m[1] && m[1].trim() && !/direct|clinic|handover|pickup|request|patient|self/i.test(m[1].trim())) {
       refDoctor = `Dr. ${m[1].trim().replace(/^dr\.?\s*/i, '')}`;
     }
   }
@@ -258,13 +256,15 @@ export const StandardReportTemplate: React.FC<TemplateProps> = ({
                   {patientAddress}
                 </td>
               </tr>
-              <tr>
-                <td style={{ color: T.slate700, padding: '1px 0', fontWeight: 600 }}>Referred by</td>
-                <td style={{ color: T.slate700, padding: '1px 2px' }}>:</td>
-                <td style={{ fontWeight: 700, color: '#0f172a' }}>
-                  {refDoctor}
-                </td>
-              </tr>
+              {refDoctor ? (
+                <tr>
+                  <td style={{ color: T.slate700, padding: '1px 0', fontWeight: 600 }}>Referred by</td>
+                  <td style={{ color: T.slate700, padding: '1px 2px' }}>:</td>
+                  <td style={{ fontWeight: 700, color: '#0f172a' }}>
+                    {refDoctor}
+                  </td>
+                </tr>
+              ) : null}
               <tr>
                 <td style={{ color: T.slate700, padding: '1px 0', fontWeight: 600 }}>Reg. no.</td>
                 <td style={{ color: T.slate700, padding: '1px 2px' }}>:</td>
