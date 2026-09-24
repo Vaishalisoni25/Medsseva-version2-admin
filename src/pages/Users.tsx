@@ -33,6 +33,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   'LAB_DEPARTMENT': 'Lab Department',
   'EXECUTIVE': 'Executive',
   'PATHOLOGIST': 'Pathologist',
+  'PATHOLOGY_PARTNER': 'Pathology Partner',
 };
 
 const ROLE_THEMES: Record<string, { bg: string; text: string; border: string }> = {

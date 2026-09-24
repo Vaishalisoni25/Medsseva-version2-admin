@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { usePartnersQuery, useBranchesQuery } from '@/hooks/useAdminQueries';
+import { usePartnersQuery, useBranchesQuery, useRolesQuery } from '@/hooks/useAdminQueries';
 import { testService, commissionService } from '../services/api';
 import { customFormatService } from '@/services/customFormat.service';
 import { exportInvoiceToPdf } from '@/utils/exportInvoicePdf';
@@ -104,12 +104,21 @@ interface Partner {
   correctionReason?: string;
   isAvailable: boolean;
   createdAt: string;
+  branchId?: string;
   user: {
     id: string;
     name: string;
     email?: string;
     mobile: string;
     createdAt: string;
+    adminUser?: {
+      id?: string;
+      roleId?: string;
+      branchId?: string;
+      isActive?: boolean;
+      role?: { id: string; name: string; slug: string };
+      branch?: { id: string; name: string; city?: string };
+    };
   };
   documents?: PartnerDocumentItem[];
 }
@@ -224,9 +233,12 @@ export const PathologyPartnersPage: React.FC = () => {
   const [formCommissionRate, setFormCommissionRate] = useState<number>(30);
   const [formPaymentCycle, setFormPaymentCycle] = useState('MONTHLY');
   const [formApprovalStatus, setFormApprovalStatus] = useState<ApprovalStatus>('APPROVED');
+  const [formAdminRoleId, setFormAdminRoleId] = useState('');
+  const [formGrantAdminAccess, setFormGrantAdminAccess] = useState(true);
   const [savingPartner, setSavingPartner] = useState(false);
 
   const { data: partnersData, isLoading: partnersQueryLoading } = usePartnersQuery();
+  const { data: rolesData } = useRolesQuery();
   const isLoading = partnersQueryLoading && partners.length === 0;
 
   useEffect(() => {
@@ -346,6 +358,9 @@ export const PathologyPartnersPage: React.FC = () => {
     setFormCommissionRate(30);
     setFormPaymentCycle('MONTHLY');
     setFormApprovalStatus('PENDING');
+    const defaultRole = (rolesData || []).find((r: any) => r.slug === 'branch_admin' || r.slug === 'admin') || rolesData?.[0];
+    setFormAdminRoleId(defaultRole?.id || '');
+    setFormGrantAdminAccess(true);
     setPartnerModalOpen(true);
   };
 
@@ -364,6 +379,10 @@ export const PathologyPartnersPage: React.FC = () => {
     setFormCommissionRate(p.commissionRate !== undefined && p.commissionRate !== null ? Number(p.commissionRate) : 30);
     setFormPaymentCycle(p.paymentCycle || 'MONTHLY');
     setFormApprovalStatus(p.approvalStatus || 'APPROVED');
+    const existingRoleId = p.user?.adminUser?.roleId || (p.user?.adminUser as any)?.role?.id;
+    const defaultRole = (rolesData || []).find((r: any) => r.slug === 'branch_admin' || r.slug === 'admin') || rolesData?.[0];
+    setFormAdminRoleId(existingRoleId || defaultRole?.id || '');
+    setFormGrantAdminAccess(Boolean(p.user?.adminUser || true));
     setPartnerModalOpen(true);
   };
 
@@ -386,7 +405,7 @@ export const PathologyPartnersPage: React.FC = () => {
       return;
     }
     if (!editingPartner && !formPassword) {
-      toast.error('Password is required for partner portal login');
+      toast.error('Password is required for partner login');
       return;
     }
 
@@ -403,19 +422,25 @@ export const PathologyPartnersPage: React.FC = () => {
         commissionRate: Number(formCommissionRate) || 30,
         paymentCycle: formPaymentCycle || 'MONTHLY',
         approvalStatus: formApprovalStatus,
+        adminRoleId: formAdminRoleId || undefined,
+        grantAdminAccess: formGrantAdminAccess,
       };
       if (formPassword) payload.password = formPassword;
 
       if (editingPartner) {
         const updated = await testService.updatePartner(editingPartner.id, payload);
-        setPartners(prev => prev.map(p => p.id === editingPartner.id ? { ...p, ...updated } : p));
+        const updatedObj = updated?.partner || updated;
+        setPartners(prev => prev.map(p => p.id === editingPartner.id ? { ...p, ...updatedObj } : p));
         if (selectedPartner?.id === editingPartner.id) {
-          setSelectedPartner(prev => prev ? { ...prev, ...updated } : null);
+          setSelectedPartner(prev => prev ? { ...prev, ...updatedObj } : null);
         }
+        queryClient.invalidateQueries({ queryKey: ['partners'] });
         toast.success('Partner updated successfully');
       } else {
         const created = await testService.createPartner(payload);
-        setPartners(prev => [created, ...prev]);
+        const createdObj = created?.partner || created;
+        setPartners(prev => [createdObj, ...prev]);
+        queryClient.invalidateQueries({ queryKey: ['partners'] });
         toast.success('Partner added successfully');
       }
       setPartnerModalOpen(false);
@@ -1112,11 +1137,24 @@ export const PathologyPartnersPage: React.FC = () => {
                             {(() => {
                               const partnerBranchId = (partner as any).branchId || (partner as any).user?.adminUser?.branchId;
                               const matchedBranch = branches.find((b: any) => b.id === partnerBranchId) || (partner as any).user?.adminUser?.branch;
-                              return matchedBranch ? (
-                                <span className="text-[10px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
-                                  {matchedBranch.name}
-                                </span>
-                              ) : null;
+                              const adminRole = (partner as any).user?.adminUser?.role;
+                              const hasAdminAccess = (partner as any).user?.adminUser?.isActive;
+                              return (
+                                <>
+                                  {matchedBranch && (
+                                    <span className="text-[10px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800 flex items-center gap-1">
+                                      <Building2 className="w-2.5 h-2.5" />
+                                      {matchedBranch.name}
+                                    </span>
+                                  )}
+                                  {adminRole && hasAdminAccess && (
+                                    <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                                      <ShieldCheck className="w-2.5 h-2.5" />
+                                      {adminRole.name}
+                                    </span>
+                                  )}
+                                </>
+                              );
                             })()}
                           </div>
                         </td>
@@ -1670,29 +1708,6 @@ export const PathologyPartnersPage: React.FC = () => {
                     />
                   </div>
 
-                  {/* Password */}
-                  <div>
-                    <label className="block text-xs font-bold text-foreground mb-1.5">
-                      {editingPartner ? 'New Password (leave blank to keep current)' : 'Account Password'} {!editingPartner && <span className="text-destructive">*</span>}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder={editingPartner ? '••••••••' : 'Enter strong password'}
-                        value={formPassword}
-                        onChange={e => setFormPassword(e.target.value)}
-                        className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
                   {/* Partner Code */}
                   <div>
                     <label className="block text-xs font-bold text-foreground mb-1.5">
@@ -1705,6 +1720,102 @@ export const PathologyPartnersPage: React.FC = () => {
                       onChange={e => setFormPartnerCode(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-mono"
                     />
+                  </div>
+
+                  {/* Admin Panel Access & Role Assignment Card */}
+                  <div className="md:col-span-2 p-5 bg-gradient-to-br from-indigo-50/70 via-background to-blue-50/50 dark:from-indigo-950/30 dark:via-background dark:to-blue-950/20 border border-indigo-200/80 dark:border-indigo-800/50 rounded-2xl space-y-4 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
+                          <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-black text-indigo-900 dark:text-indigo-200 uppercase tracking-wider block">
+                            Admin Panel Access & Lab Branch Credentials
+                          </label>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Allow this partner to log into the Admin Panel to manage their lab's patients, bookings, and reports as Branch Admin.
+                          </p>
+                        </div>
+                      </div>
+
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={formGrantAdminAccess}
+                          onChange={e => setFormGrantAdminAccess(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        <span className="ml-2 text-xs font-bold text-foreground">
+                          {formGrantAdminAccess ? 'Admin Access Enabled' : 'Disabled'}
+                        </span>
+                      </label>
+                    </div>
+
+                    {formGrantAdminAccess && (
+                      <div className="space-y-3.5 pt-2 border-t border-indigo-100 dark:border-indigo-900/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          {/* Admin Role Selection */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-foreground mb-1">
+                              Assigned Admin Role <span className="text-destructive">*</span>
+                            </label>
+                            <select
+                              value={formAdminRoleId}
+                              onChange={e => setFormAdminRoleId(e.target.value)}
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-background text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                            >
+                              {(rolesData || [])
+                                .filter((r: any) => r.slug !== 'super_admin')
+                                .map((r: any) => (
+                                  <option key={r.id} value={r.id}>
+                                    {r.name} ({r.slug})
+                                  </option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Permissions configured under Roles & Permissions will govern what sections this partner can view and manage.
+                            </p>
+                          </div>
+
+                          {/* Admin Password */}
+                          <div>
+                            <label className="block text-[11px] font-bold text-foreground mb-1">
+                              {editingPartner ? 'Admin Panel Password (leave blank to keep current)' : 'Admin Panel Password'} {!editingPartner && <span className="text-destructive">*</span>}
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showPassword ? 'text' : 'password'}
+                                placeholder={editingPartner ? '•••••••• (Keep existing password)' : 'Enter secure admin password'}
+                                value={formPassword}
+                                onChange={e => setFormPassword(e.target.value)}
+                                className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-background text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                              >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Partner will use their Mobile Number / Email + this Password to sign into the Admin Panel.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Branch Isolation Informational Callout */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/40 text-blue-900 dark:text-blue-200 text-xs">
+                          <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                          <div>
+                            <span className="font-bold">Branch Data Isolation Active: </span>
+                            A dedicated Branch corresponding to this lab is automatically maintained. Upon logging into the Admin Panel, this partner will strictly see and manage data belonging to their own branch (doctors, staff, bookings, reports, inventory), without accessing any other branch or global system records.
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Payment Cycle Section */}
