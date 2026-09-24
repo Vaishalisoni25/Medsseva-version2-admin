@@ -23,7 +23,7 @@ import { cn } from '../utils/cn';
 
 type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED' | 'BLOCKED' | 'CORRECTION_REQUIRED';
 
-export type CanonicalPartnerType = 'ALL' | 'LAB_PARTNER' | 'PHLEBOTOMIST' | 'CHANNEL_PARTNER';
+export type CanonicalPartnerType = 'ALL' | 'LAB_PARTNER' | 'CHANNEL_PARTNER';
 
 export interface PartnerDocumentItem {
   id: string;
@@ -552,14 +552,16 @@ export const PathologyPartnersPage: React.FC = () => {
   };
 
   const handleDeletePartner = async (partnerId: string, labName: string) => {
-    if (!window.confirm(`Are you sure you want to delete partner "${labName}"?`)) return;
+    if (!window.confirm(`Are you sure you want to delete partner "${labName}"? This action will unlink associated records and cannot be undone.`)) return;
     try {
       await testService.deletePartner(partnerId);
       setPartners(prev => prev.filter(p => p.id !== partnerId));
       if (selectedPartner?.id === partnerId) setSelectedPartner(null);
+      queryClient.invalidateQueries({ queryKey: ['partners'] });
       toast.success('Partner deleted successfully');
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to delete partner');
+      console.error('Delete partner error:', err);
+      toast.error(err?.response?.data?.error || err?.response?.data?.details || 'Failed to delete partner');
     }
   };
 
@@ -715,6 +717,22 @@ export const PathologyPartnersPage: React.FC = () => {
 
   const basePartners = React.useMemo(() => {
     return partners.filter((p: any) => {
+      // Exclude Phlebotomists from Tie-up Partners & Portal (Phlebotomists are managed in Collection Partner Management)
+      const roleUpper = String(p.role || '').toUpperCase();
+      const labNameUpper = String(p.labName || '').toUpperCase();
+      const userRoleUpper = String(p.user?.role || '').toUpperCase();
+      const codeUpper = String(p.partnerCode || '').toUpperCase();
+      if (
+        roleUpper.includes('PHLEBO') ||
+        roleUpper.includes('COLLECTOR') ||
+        roleUpper === 'EXECUTIVE' ||
+        userRoleUpper === 'EXECUTIVE' ||
+        labNameUpper.includes('PHLEBOTOMIST') ||
+        codeUpper.includes('PHLEBO')
+      ) {
+        return false;
+      }
+
       const partnerBranchId = p.branchId || p.user?.adminUser?.branchId;
       const partnerBranch = branches.find((b: any) => b.id === partnerBranchId) || p.user?.adminUser?.branch;
 
@@ -759,7 +777,6 @@ export const PathologyPartnersPage: React.FC = () => {
   const typeCounts = {
     ALL: basePartners.length,
     LAB_PARTNER: basePartners.filter(p => getPartnerTypeInfo(p.role).typeKey === 'LAB_PARTNER').length,
-    PHLEBOTOMIST: basePartners.filter(p => getPartnerTypeInfo(p.role).typeKey === 'PHLEBOTOMIST').length,
     CHANNEL_PARTNER: basePartners.filter(p => getPartnerTypeInfo(p.role).typeKey === 'CHANNEL_PARTNER').length,
   };
 
@@ -1036,7 +1053,6 @@ export const PathologyPartnersPage: React.FC = () => {
             {[
               { id: 'ALL', label: 'All Partners', icon: Building2, count: typeCounts.ALL },
               { id: 'LAB_PARTNER', label: 'Lab Partner', icon: Microscope, count: typeCounts.LAB_PARTNER },
-              { id: 'PHLEBOTOMIST', label: 'Phlebotomist', icon: UserCheck, count: typeCounts.PHLEBOTOMIST },
               { id: 'CHANNEL_PARTNER', label: 'Channel Partner', icon: Building2, count: typeCounts.CHANNEL_PARTNER },
             ].map(tab => {
               const TabIcon = tab.icon;
@@ -1766,17 +1782,10 @@ export const PathologyPartnersPage: React.FC = () => {
                     </label>
                     <select
                       value={formRole}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setFormRole(val);
-                        if (val === 'PHLEBOTOMIST') {
-                          setFormGrantAdminAccess(false);
-                        }
-                      }}
+                      onChange={e => setFormRole(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-bold text-foreground"
                     >
                       <option value="LAB_PARTNER">Lab Partner</option>
-                      <option value="PHLEBOTOMIST">Phlebotomist</option>
                       <option value="CHANNEL_PARTNER">Channel Partner</option>
                     </select>
                   </div>
