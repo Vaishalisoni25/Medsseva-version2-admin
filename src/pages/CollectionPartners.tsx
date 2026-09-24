@@ -1252,16 +1252,16 @@ export const CollectionPartnersPage: React.FC = () => {
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-medium text-foreground">
-                            ₹{item.testValue.toLocaleString('en-IN')}
+                            ₹{(item.testValue || 0).toLocaleString('en-IN')}
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-semibold text-[#0a7c7c]">
-                            ₹{item.commission.toLocaleString('en-IN')}
+                            ₹{(item.commission || 0).toLocaleString('en-IN')}
                             <div className="text-[10px] text-muted-foreground">@{item.commissionRate}%</div>
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                            ₹{item.walletCredit.toLocaleString('en-IN')}
+                            ₹{(item.walletCredit || 0).toLocaleString('en-IN')}
                           </td>
 
                           <td className="py-3.5 px-4 text-center">
@@ -1345,16 +1345,16 @@ export const CollectionPartnersPage: React.FC = () => {
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-medium text-foreground">
-                            ₹{item.totalTestValue.toLocaleString('en-IN')}
+                            ₹{(item.totalTestValue || 0).toLocaleString('en-IN')}
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-semibold text-[#0a7c7c]">
-                            ₹{item.totalCommission.toLocaleString('en-IN')}
+                            ₹{(item.totalCommission || 0).toLocaleString('en-IN')}
                             <div className="text-[10px] text-muted-foreground">@{item.commissionRate}%</div>
                           </td>
 
                           <td className="py-3.5 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                            ₹{item.walletAmountCredited.toLocaleString('en-IN')}
+                            ₹{(item.walletAmountCredited || 0).toLocaleString('en-IN')}
                           </td>
 
                           <td className="py-3.5 px-4 text-center">
