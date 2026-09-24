@@ -476,6 +476,8 @@ export const collectionPartnerService = {
     api.get('/collection-partners/lab-wise', { params }).then(r => r.data),
   updatePartnerStatus: (id: string, data: any) =>
     api.patch(`/collection-partners/${id}/status`, data).then(r => r.data),
+  deletePartner: (id: string) =>
+    api.delete(`/collection-partners/${id}`).then(r => r.data),
   creditCommissionPayout: (data: { bookingId: string; partnerId: string; status?: string; notes?: string }) =>
     api.patch('/collection-partners/commissions/payout', data).then(r => r.data),
 };

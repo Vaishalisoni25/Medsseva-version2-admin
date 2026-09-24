@@ -37,6 +37,7 @@ import {
   GraduationCap,
   FileText,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppSelector } from '../redux/hooks';
@@ -268,6 +269,7 @@ export const CollectionPartnersPage: React.FC = () => {
   const [editBranchId, setEditBranchId] = useState<string>('');
   const [editIsAvailable, setEditIsAvailable] = useState<boolean>(true);
   const [savingConfig, setSavingConfig] = useState(false);
+  const [isDeletingPartner, setIsDeletingPartner] = useState(false);
 
   // Credit Commission Payout Modal State
   const [payoutItem, setPayoutItem] = useState<{
@@ -439,6 +441,31 @@ export const CollectionPartnersPage: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to suspend phlebotomist:', err);
       toast.error('Failed to suspend phlebotomist');
+    }
+  };
+
+  // Permanently Delete Phlebotomist (App Freelancer or Staff / In-House)
+  const handleDeletePartner = async (partnerId: string, partnerName: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete phlebotomist "${partnerName}"? This action will unlink collections and cannot be undone.`)) {
+      return;
+    }
+    try {
+      setIsDeletingPartner(true);
+      await collectionPartnerService.deletePartner(partnerId);
+      toast.success(`Phlebotomist "${partnerName}" deleted successfully`);
+      if (configModalPartner?.id === partnerId) {
+        setConfigModalPartner(null);
+      }
+      if (selectedPartnerId === partnerId) {
+        setSelectedPartnerId(null);
+        setPartnerDetails(null);
+      }
+      fetchData(true);
+    } catch (err: any) {
+      console.error('Failed to delete phlebotomist:', err);
+      toast.error(err?.response?.data?.error || err?.response?.data?.details || 'Failed to delete phlebotomist');
+    } finally {
+      setIsDeletingPartner(false);
     }
   };
 
@@ -1134,16 +1161,30 @@ export const CollectionPartnersPage: React.FC = () => {
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>Details</span>
                                 </button>
-                                {p.phlebotomistType !== 'EMPLOYEE' && !p.isEmployee && (
-                                  <button
-                                    onClick={() => openConfigModal(p)}
-                                    className="px-2.5 py-1.5 rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-400 hover:bg-[#0a7c7c] hover:text-white transition-all text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-95 border border-teal-500/20 cursor-pointer"
-                                    title="Edit Commission Rate & Settings"
-                                  >
-                                    <Percent className="w-3 h-3" />
-                                    <span>Edit Commission</span>
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => openConfigModal(p)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-400 hover:bg-[#0a7c7c] hover:text-white transition-all text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-95 border border-teal-500/20 cursor-pointer"
+                                  title={p.phlebotomistType !== 'EMPLOYEE' && !p.isEmployee ? "Edit Commission Rate & Settings" : "Edit Phlebotomist Settings & Operations"}
+                                >
+                                  {p.phlebotomistType !== 'EMPLOYEE' && !p.isEmployee ? (
+                                    <>
+                                      <Percent className="w-3 h-3" />
+                                      <span>Edit Commission</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <SlidersHorizontal className="w-3 h-3" />
+                                      <span>Edit Staff</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleDeletePartner(p.id, p.name)}
+                                  className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white transition-all text-xs font-semibold flex items-center gap-1 shadow-sm active:scale-95 border border-rose-500/20 cursor-pointer"
+                                  title="Delete Phlebotomist"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -1561,13 +1602,23 @@ export const CollectionPartnersPage: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   {partnerDetails?.partner && (
-                    <button
-                      onClick={() => openConfigModal(partnerDetails.partner)}
-                      className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-medium border border-border flex items-center gap-1 transition-all"
-                    >
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>Edit Settings</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={() => openConfigModal(partnerDetails.partner)}
+                        className="px-3 py-1.5 rounded-lg bg-muted text-foreground hover:bg-muted/80 text-xs font-medium border border-border flex items-center gap-1 transition-all"
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>Edit Settings</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeletePartner(partnerDetails.partner.id, partnerDetails.partner.name)}
+                        className="px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white text-xs font-medium border border-rose-500/20 flex items-center gap-1 transition-all cursor-pointer"
+                        title="Delete Phlebotomist"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
+                      </button>
+                    </>
                   )}
                   <button
                     onClick={() => {
@@ -2004,20 +2055,31 @@ export const CollectionPartnersPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
                 <button
-                  onClick={() => setConfigModalPartner(null)}
-                  className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-muted text-muted-foreground hover:text-foreground"
+                  type="button"
+                  onClick={() => handleDeletePartner(configModalPartner.id, configModalPartner.name)}
+                  disabled={isDeletingPartner}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-900/50 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  Cancel
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isDeletingPartner ? 'Deleting...' : 'Delete Phlebotomist'}</span>
                 </button>
-                <button
-                  onClick={handleSaveConfig}
-                  disabled={savingConfig}
-                  className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-[#0a7c7c] text-white hover:bg-[#086363] disabled:opacity-60 shadow-sm"
-                >
-                  {savingConfig ? 'Saving...' : 'Save Changes'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setConfigModalPartner(null)}
+                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-muted text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveConfig}
+                    disabled={savingConfig}
+                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-[#0a7c7c] text-white hover:bg-[#086363] disabled:opacity-60 shadow-sm"
+                  >
+                    {savingConfig ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
