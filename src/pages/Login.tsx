@@ -42,9 +42,9 @@ const handleLogin = async (e: React.FormEvent) => {
         return;
       }
 
-const allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'FRANCHISE', 'LAB_DEPARTMENT', 'PATHOLOGIST', 'EXECUTIVE'];
+      const allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'FRANCHISE', 'LAB_DEPARTMENT', 'PATHOLOGIST', 'PATHOLOGY_PARTNER'];
       if (!allowedRoles.includes(data.user.role)) {
-        dispatch(loginFailure('Access denied. Only admin accounts can access this panel.'));
+        dispatch(loginFailure('Access denied. Phlebotomists operate via the Mobile App and cannot access this Admin Panel.'));
         setIsLocalLoading(false);
         return;
       }
@@ -62,6 +62,8 @@ const allowedRoles = ['ADMIN', 'SUPER_ADMIN', 'FRANCHISE', 'LAB_DEPARTMENT', 'PA
           adminRoleSlug: data.user.adminRoleSlug || null,
           permissions: data.user.permissions || [],
           accessibleModules: data.user.accessibleModules || [],
+          branchId: data.user.branchId || null,
+          branchName: data.user.branchName || null,
         },
         token: data.token,
       }));

@@ -10,6 +10,7 @@ export type UserRole =
   | 'FRANCHISE'
   | 'LAB_DEPARTMENT'
   | 'EXECUTIVE'
+  | 'PATHOLOGY_PARTNER'
   | 'PATHOLOGIST';
 
 export interface User {
@@ -21,6 +22,8 @@ export interface User {
   phone?: string;
   status: 'active' | 'inactive';
   franchiseId?: string;
+  branchId?: string | null;
+  branchName?: string | null;
   uhid?: string;
   dob?: string;
   gender?: string;

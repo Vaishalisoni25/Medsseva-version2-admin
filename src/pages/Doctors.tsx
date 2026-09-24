@@ -104,6 +104,7 @@ export const DoctorsPage: React.FC = () => {
   const [branchFilter, setBranchFilter] = useState('ALL');
   const [approvalFilter, setApprovalFilter] = useState<'ALL' | 'APPROVED' | 'PENDING' | 'REJECTED' | 'SUSPENDED'>('ALL');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [doctorCategoryFilter, setDoctorCategoryFilter] = useState<'ALL' | 'FREELANCER' | 'IN_HOUSE'>('ALL');
 
   // Portal View Specific State
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
@@ -264,7 +265,7 @@ export const DoctorsPage: React.FC = () => {
     setFormRegistrationNo('');
     setFormSignatureUrl('');
     setDoctorType('EMPLOYEE');
-    setFormCommissionRate(30);
+    setFormCommissionRate(0);
     setFormPaymentCycle('MONTHLY');
     setSelectedPerms(new Set());
     setIsCustomRole(false);
@@ -294,7 +295,7 @@ export const DoctorsPage: React.FC = () => {
     setFormBranchId(d.branchId || (d.branch?.id) || '');
     setFormSignatureUrl(d.signatureUrl || '');
     setDoctorType(d.doctorType || 'EMPLOYEE');
-    setFormCommissionRate(d.commissionRate !== undefined && d.commissionRate !== null ? Number(d.commissionRate) : 30);
+    setFormCommissionRate(d.commissionRate !== undefined && d.commissionRate !== null ? Number(d.commissionRate) : (d.doctorType === 'DIRECT' ? 30 : 0));
     setFormPaymentCycle(d.paymentCycle || 'MONTHLY');
     setFormFranchiseId('');
     setFormDepartment('');
@@ -429,9 +430,9 @@ export const DoctorsPage: React.FC = () => {
         qualification: formQualification || undefined,
         registrationNo: formRegistrationNo || undefined,
         signatureUrl: formSignatureUrl || undefined,
-        doctorType: userType === 'DOCTOR' ? doctorType : undefined,
-        commissionRate: Number(formCommissionRate) || 30,
-        paymentCycle: formPaymentCycle || 'MONTHLY',
+        doctorType: userType === 'DOCTOR' ? (editing ? (doctorType || 'EMPLOYEE') : 'EMPLOYEE') : undefined,
+        commissionRate: doctorType === 'DIRECT' ? Number(formCommissionRate || 0) : 0,
+        paymentCycle: doctorType === 'DIRECT' ? (formPaymentCycle || 'MONTHLY') : 'MONTHLY',
       };
       if (formPassword) payload.password = formPassword;
 
@@ -559,6 +560,10 @@ export const DoctorsPage: React.FC = () => {
 
   const filteredDoctors = useMemo(() => {
     return baseDoctors.filter(d => {
+      // Category filter: Freelancer (App) vs In-House
+      if (doctorCategoryFilter === 'FREELANCER' && d.doctorType !== 'DIRECT') return false;
+      if (doctorCategoryFilter === 'IN_HOUSE' && d.doctorType === 'DIRECT') return false;
+
       const appStatus = d.approvalStatus || 'PENDING';
       if (approvalFilter !== 'ALL' && appStatus !== approvalFilter) return false;
       if (activeFilter === 'ACTIVE' && !d.isActive) return false;
@@ -587,7 +592,7 @@ export const DoctorsPage: React.FC = () => {
       }
       return true;
     });
-  }, [baseDoctors, branches, approvalFilter, activeFilter, specFilter, locationFilter, branchFilter, search]);
+  }, [baseDoctors, branches, doctorCategoryFilter, approvalFilter, activeFilter, specFilter, locationFilter, branchFilter, search]);
 
   const filteredReferrals = useMemo(() => {
     if (!portalData?.referrals) return [];
@@ -904,19 +909,41 @@ export const DoctorsPage: React.FC = () => {
         <>
           <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-card border border-border rounded-xl p-3">
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border">
+              {/* Doctor Category Tabs (Freelancer vs In-House) */}
+              <div className="flex items-center gap-1 bg-muted/80 p-1 rounded-xl border border-border">
                 {[
                   { id: 'ALL', label: `All Doctors (${baseDoctors.length})` },
+                  { id: 'FREELANCER', label: `App Freelancers (${baseDoctors.filter(d => d.doctorType === 'DIRECT').length})` },
+                  { id: 'IN_HOUSE', label: `In-House Doctors (${baseDoctors.filter(d => d.doctorType !== 'DIRECT').length})` },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setDoctorCategoryFilter(tab.id as any)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      doctorCategoryFilter === tab.id
+                        ? 'bg-teal-600 text-white shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Approval Filter Tabs */}
+              <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border">
+                {[
+                  { id: 'ALL', label: `All (${baseDoctors.length})` },
                   { id: 'APPROVED', label: `Approved (${baseDoctors.filter(d => d.approvalStatus === 'APPROVED').length})` },
-                  { id: 'PENDING', label: `Pending Review (${baseDoctors.filter(d => (d.approvalStatus || 'PENDING') === 'PENDING').length})` },
+                  { id: 'PENDING', label: `Pending (${baseDoctors.filter(d => (d.approvalStatus || 'PENDING') === 'PENDING').length})` },
                   { id: 'SUSPENDED', label: `Suspended (${baseDoctors.filter(d => d.approvalStatus === 'SUSPENDED').length})` },
                 ].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setApprovalFilter(tab.id as any)}
-                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       approvalFilter === tab.id
-                        ? 'bg-teal-600 text-white shadow-sm'
+                        ? 'bg-slate-700 text-white shadow-sm'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -1043,9 +1070,20 @@ export const DoctorsPage: React.FC = () => {
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200/60 inline-block mb-0.5">
-                          {d.specialization || 'Pathology'}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200/60 inline-block">
+                            {d.specialization || 'Pathology'}
+                          </span>
+                          {d.doctorType === 'DIRECT' ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 inline-flex items-center gap-1">
+                              App Freelancer ({d.commissionRate ?? 30}% Comm)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 inline-block">
+                              In-House Doctor
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-muted-foreground">{d.designation || 'Senior Consultant'}</div>
                       </td>
 
@@ -1320,17 +1358,67 @@ export const DoctorsPage: React.FC = () => {
                         className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-semibold text-foreground mb-1 block">Doctor Type</label>
-                      <select
-                        value={doctorType}
-                        onChange={e => setDoctorType(e.target.value as 'EMPLOYEE' | 'DIRECT')}
-                        className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30 font-semibold text-teal-800"
-                      >
-                        <option value="EMPLOYEE">Internal Employee / Pathologist</option>
-                        <option value="DIRECT">Direct Referral Partner (External)</option>
-                      </select>
-                    </div>
+                    {/* Conditional Doctor Category / Commission Section */}
+                    {doctorType === 'DIRECT' ? (
+                      <div className="md:col-span-2 p-3.5 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                            <DollarSign className="w-4 h-4 text-emerald-600" />
+                            Freelancer Doctor - Referral Commission Settings
+                          </span>
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-200/70 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 uppercase tracking-wider">
+                            App Registered Doctor
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div>
+                            <label className="text-xs font-semibold text-foreground mb-1 block">
+                              Commission Rate (%) *
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step="0.5"
+                                value={formCommissionRate}
+                                onChange={e => setFormCommissionRate(Math.max(0, Math.min(100, Number(e.target.value))))}
+                                placeholder="30"
+                                className="w-full h-10 px-3 pr-8 bg-background border border-emerald-300 dark:border-emerald-700 rounded-xl text-sm font-bold text-emerald-700 dark:text-emerald-300 outline-none focus:ring-2 focus:ring-emerald-500/30"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">%</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Tests referred by this doctor will be credited at this percentage.
+                            </p>
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-semibold text-foreground mb-1 block">Payout Cycle</label>
+                            <select
+                              value={formPaymentCycle}
+                              onChange={e => setFormPaymentCycle(e.target.value)}
+                              className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/30"
+                            >
+                              <option value="WEEKLY">Weekly Payout</option>
+                              <option value="15_DAYS">15 Days (Fortnightly)</option>
+                              <option value="MONTHLY">Monthly Settlement</option>
+                            </select>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Frequency of commission invoice settlement.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-xs font-semibold text-foreground mb-1 block">Doctor Type</label>
+                        <div className="w-full h-10 px-3 bg-muted/40 border border-border rounded-xl text-xs font-semibold text-teal-800 dark:text-teal-300 flex items-center">
+                          Internal Employee / Pathologist (Salaried)
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs font-semibold text-foreground mb-1 block">Assign Branch / Area</label>
                       <select
@@ -1442,33 +1530,6 @@ export const DoctorsPage: React.FC = () => {
                       <p className="text-[10px] text-muted-foreground">
                         This signature image will appear on generated diagnostic reports in place of the generic digital signature stamp. If blank, standard digital signature stamp will be used.
                       </p>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-foreground mb-1 block">Commission Rate (%) *</label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={formCommissionRate}
-                          onChange={e => setFormCommissionRate(Number(e.target.value))}
-                          placeholder="30"
-                          className="w-full h-10 pl-3 pr-8 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30 font-bold"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-700 dark:text-teal-300">%</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-foreground mb-1 block">Payment Cycle</label>
-                      <select
-                        value={formPaymentCycle}
-                        onChange={e => setFormPaymentCycle(e.target.value)}
-                        className="w-full h-10 px-3 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/30 font-medium"
-                      >
-                        <option value="MONTHLY">Monthly</option>
-                        <option value="15_DAYS">15 Days (Fortnightly)</option>
-                        <option value="WEEKLY">Weekly (7 Days)</option>
-                      </select>
                     </div>
                   </div>
                 </div>
@@ -1785,23 +1846,25 @@ export const DoctorsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Commission & Commercials Card */}
-              <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
-                <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <DollarSign className="w-3.5 h-3.5 text-teal-600" />
-                  Commercials & Commission
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <span className="text-[11px] text-muted-foreground block">Test Referral Commission</span>
-                    <span className="font-bold text-emerald-600 text-sm">{viewingDoctor.commissionRate ?? 30}%</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-muted-foreground block">Payment Cycle</span>
-                    <span className="font-semibold text-foreground">{viewingDoctor.paymentCycle || 'MONTHLY'}</span>
+              {/* Commission & Commercials Card (only for non-employee / freelance referral doctors with commission) */}
+              {viewingDoctor.doctorType !== 'EMPLOYEE' && (viewingDoctor.commissionRate ?? 0) > 0 && (
+                <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-teal-600" />
+                    Commercials & Commission
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-[11px] text-muted-foreground block">Test Referral Commission</span>
+                      <span className="font-bold text-emerald-600 text-sm">{viewingDoctor.commissionRate ?? 30}%</span>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-muted-foreground block">Payment Cycle</span>
+                      <span className="font-semibold text-foreground">{viewingDoctor.paymentCycle || 'MONTHLY'}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Digital Signature & Stamp Card */}
               <div className="bg-muted/30 border border-border/80 rounded-xl p-4 space-y-3">

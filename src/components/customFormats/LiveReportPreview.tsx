@@ -198,9 +198,9 @@ export const LiveReportPreview: React.FC<LiveReportPreviewProps> = ({
       ? `Dr. ${patientData.referringDoctor.name.replace(/^dr\.?\s*/i, '')}`
       : (patientData?.referringDoctorName
         ? `Dr. ${patientData.referringDoctorName.replace(/^dr\.?\s*/i, '')}`
-        : (typeof patientData?.refDoctor === 'string'
+        : (typeof patientData?.refDoctor === 'string' && patientData.refDoctor !== 'Self' && !patientData.refDoctor.toLowerCase().includes('self')
           ? patientData.refDoctor
-          : 'Self')),
+          : null)),
     sampleId: typeof patientData?.sampleId === 'string' ? patientData.sampleId : 'SMP-849201',
     bookingCode: typeof patientData?.bookingCode === 'string' ? patientData.bookingCode : 'MEDS-88219',
     collectionDate: typeof patientData?.collectionDate === 'string' ? patientData.collectionDate : '12/03/2026 08:30 AM',
@@ -373,7 +373,7 @@ export const LiveReportPreview: React.FC<LiveReportPreviewProps> = ({
                       <td style={{ fontWeight: 700, color: '#0f172a', paddingLeft: '6px' }}>{patient.mobile}</td>
                     </tr>
                   )}
-                  {fields.showReferredBy && (
+                  {fields.showReferredBy && patient.refDoctor && (
                     <tr>
                       <td style={{ color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap', paddingRight: '4px' }}>Referred By</td>
                       <td style={{ width: '8px', color: '#64748b', textAlign: 'center' }}>:</td>
