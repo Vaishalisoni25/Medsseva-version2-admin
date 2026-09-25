@@ -173,7 +173,10 @@ const phlebotomists: any[] = [];
     }
     let matchesBranch = true;
     if (currentBranchId && currentBranchId !== 'all') {
-      matchesBranch = b.branchId === currentBranchId;
+      const userPartnerId = (currentUser as any)?.partner?.id || (currentUser as any)?.partnerId;
+      const bPartnerId = (b as any).assignedPartnerId;
+      matchesBranch = (b.branchId === currentBranchId) || 
+                      (!!userPartnerId && !!bPartnerId && bPartnerId === userPartnerId);
     }
 
     return matchesSearch && matchesStatus && matchesRole && matchesCity && matchesBranch;

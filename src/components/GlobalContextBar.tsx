@@ -39,7 +39,8 @@ export const GlobalContextBar: React.FC = () => {
   const dispatch = useAppDispatch();
   const { currentCityId, currentBranchId, user } = useAppSelector(state => state.auth);
 
-  const isFranchiseAdmin = user?.role === 'franchise_admin';
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'SUPER_ADMIN' || (user as any)?.isSuperAdmin;
+  const isRestricted = !isSuperAdmin;
 
   const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     dispatch(switchContext({ cityId: e.target.value }));
@@ -63,16 +64,16 @@ export const GlobalContextBar: React.FC = () => {
         {/* City Context */}
         <div className={cn(
           "flex items-center gap-1.5 bg-black/20 border border-white/10 px-2 py-0.5 rounded-md hover:border-[#5eead4]/40 transition-colors",
-          isFranchiseAdmin && "hover:border-white/10 bg-black/40 opacity-75"
+          isRestricted && "hover:border-white/10 bg-black/40 opacity-75"
         )}>
           <MapPin className="h-3 w-3 text-[#5eead4]" />
           <select 
             value={currentCityId}
             onChange={handleCityChange}
-            disabled={isFranchiseAdmin}
+            disabled={isRestricted}
             className={cn(
               "bg-transparent border-none outline-none text-white font-bold text-[10px] pr-1 outline-none",
-              isFranchiseAdmin ? "cursor-not-allowed" : "cursor-pointer"
+              isRestricted ? "cursor-not-allowed" : "cursor-pointer"
             )}
           >
             {CITIES.map(c => (
@@ -84,16 +85,16 @@ export const GlobalContextBar: React.FC = () => {
         {/* Branch Context */}
         <div className={cn(
           "flex items-center gap-1.5 bg-black/20 border border-white/10 px-2 py-0.5 rounded-md hover:border-[#5eead4]/40 transition-colors",
-          isFranchiseAdmin && "hover:border-white/10 bg-black/40 opacity-75"
+          isRestricted && "hover:border-white/10 bg-black/40 opacity-75"
         )}>
           <Building2 className="h-3 w-3 text-[#5eead4]" />
           <select 
             value={currentBranchId}
             onChange={handleBranchChange}
-            disabled={isFranchiseAdmin}
+            disabled={isRestricted}
             className={cn(
               "bg-transparent border-none outline-none text-white font-bold text-[10px] pr-1 outline-none",
-              isFranchiseAdmin ? "cursor-not-allowed" : "cursor-pointer"
+              isRestricted ? "cursor-not-allowed" : "cursor-pointer"
             )}
           >
             {availableBranches.map(b => (
@@ -103,9 +104,9 @@ export const GlobalContextBar: React.FC = () => {
         </div>
 
         <div className="md:ml-auto flex items-center gap-2 opacity-80 text-[9px]">
-          {isFranchiseAdmin ? (
+          {isRestricted ? (
           <div className="flex items-center gap-1 bg-amber-950 border border-amber-900 text-amber-400 font-black uppercase px-2 py-0.5 rounded-full select-none">
-              <Lock className="h-2.5 w-2.5" /> Region-Restricted
+              <Lock className="h-2.5 w-2.5" /> Branch-Restricted
             </div>
           ) : (
             <div className="flex items-center gap-1 bg-emerald-950 border border-emerald-900 text-emerald-400 font-black uppercase px-2 py-0.5 rounded-full">

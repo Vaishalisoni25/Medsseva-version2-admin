@@ -124,8 +124,8 @@ return {
             })(),
             address: b.address,
             cityId: b.address?.city?.toLowerCase().slice(0, 3) || 'N/A',
-            franchiseId: undefined,
-            branchId: undefined,
+            franchiseId: b.franchiseId || undefined,
+            branchId: b.branchId || (b.assignedPartner?.branchId) || undefined,
             assignedPartnerId: b.assignedPartnerId || null,
             assignedPartner: b.assignedPartner || null,
           };

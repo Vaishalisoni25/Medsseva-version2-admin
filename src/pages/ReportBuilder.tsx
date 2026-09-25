@@ -341,11 +341,23 @@ export const ReportBuilderPage: React.FC = () => {
   useEffect(() => {
     branchService.getAll().then(res => {
       if (res?.data && Array.isArray(res.data)) {
-        setBranches(res.data);
-        if (userBranchId) {
-          setVerification(v => ({ ...v, reportBranchId: v.reportBranchId || userBranchId }));
-        } else if (res.data.length > 0) {
-          setVerification(v => ({ ...v, reportBranchId: v.reportBranchId || res.data[0].id }));
+        let allList = res.data;
+        if (!isSuperAdmin) {
+          const userPartnerId = (currentUser as any)?.partner?.id || (currentUser as any)?.partnerId;
+          const userBranchName = (currentUser as any)?.branchName;
+          const allowed = allList.filter((b: any) => 
+            (userBranchId && b.id === userBranchId) || 
+            (userPartnerId && b.id === userPartnerId) ||
+            (userBranchName && b.name === userBranchName)
+          );
+          if (allowed.length > 0) {
+            allList = allowed;
+          }
+        }
+        setBranches(allList);
+        const defaultBranchId = userBranchId || (allList.length > 0 ? allList[0].id : '');
+        if (defaultBranchId) {
+          setVerification(v => ({ ...v, reportBranchId: v.reportBranchId || defaultBranchId }));
         }
       }
     }).catch(() => {});
@@ -1575,9 +1587,13 @@ const filteredBookings = useMemo(() => {
                     <select
                       value={verification.reportBranchId}
                       onChange={e => setVerification(v => ({ ...v, reportBranchId: e.target.value }))}
-                      className="w-full text-sm border border-input rounded-lg px-3 py-2 outline-none focus:border-primary bg-card"
+                      disabled={!isSuperAdmin && branches.length <= 1}
+                      className={cn(
+                        "w-full text-sm border border-input rounded-lg px-3 py-2 outline-none focus:border-primary bg-card",
+                        !isSuperAdmin && branches.length <= 1 && "bg-muted cursor-not-allowed opacity-90"
+                      )}
                     >
-                      <option value="">- Select Laboratory Branch -</option>
+                      {isSuperAdmin && <option value="">- Select Laboratory Branch -</option>}
                       {branches.map(b => (
                         <option key={b.id} value={b.id}>{b.name} - {b.city}</option>
                       ))}

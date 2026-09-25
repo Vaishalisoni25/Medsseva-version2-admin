@@ -468,7 +468,7 @@ export const PathologyPartnersPage: React.FC = () => {
     const defaultRole = (rolesData || []).find((r: any) => r.slug === 'partner_admin' || r.slug === 'branch_admin' || r.slug === 'admin') || rolesData?.[0];
     setFormAdminRoleId(existingRoleId || defaultRole?.id || '');
     
-    const isPhlebotomist = typeInfo.typeKey === 'PHLEBOTOMIST' || String(p.role || '').toUpperCase().includes('PHLEBO');
+    const isPhlebotomist = (typeInfo.typeKey as string) === 'PHLEBOTOMIST' || String(p.role || '').toUpperCase().includes('PHLEBO');
     setFormGrantAdminAccess(isPhlebotomist ? false : Boolean(p.user?.adminUser || true));
 
     // Pre-populate permissions for this partner

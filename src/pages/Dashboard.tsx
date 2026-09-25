@@ -62,16 +62,22 @@ export const DashboardPage: React.FC = () => {
       if (user?.role === 'phlebotomist') {
         if (b.phlebotomistId !== user.id) return false;
       }
-      // Branch-scoped lock for Branch Admins ONLY
+      // Branch & Partner-scoped lock for Branch Admins / Lab Partners ONLY
+      const userPartnerId = (user as any)?.partner?.id || (user as any)?.partnerId;
+      const bPartnerId = (b as any).assignedPartnerId;
       if (!isSuper && userBranchId) {
-        if (b.branchId && b.branchId !== userBranchId) return false;
+        const matchesThisBranch = (b.branchId && b.branchId === userBranchId) || 
+                                  (userPartnerId && bPartnerId && bPartnerId === userPartnerId);
+        if (!matchesThisBranch) return false;
       }
       // Super admin sees all, unless explicit manual city/branch filter selected
       if (!isSuper && currentCityId && currentCityId !== 'all') {
         if (b.cityId !== currentCityId) return false;
       }
       if (!isSuper && currentBranchId && currentBranchId !== 'all') {
-        if (b.branchId !== currentBranchId) return false;
+        const matchesCurrentBranch = (b.branchId && b.branchId === currentBranchId) ||
+                                     (userPartnerId && bPartnerId && bPartnerId === userPartnerId);
+        if (!matchesCurrentBranch) return false;
       }
       return true;
     });
