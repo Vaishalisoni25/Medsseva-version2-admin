@@ -59,6 +59,8 @@ export default function Branches() {
   const { branches, loading } = useSelector((s: RootState) => (s as any).branches);
 
   const [search, setSearch] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'admin' | 'partner'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Branch | null>(null);
   const [form, setForm] = useState<BranchFormData>(emptyForm);
@@ -87,12 +89,23 @@ export default function Branches() {
     return true;
   });
 
-  const filtered = baseBranches.filter((b: Branch) =>
-    b.name.toLowerCase().includes(search.toLowerCase()) ||
-    b.city.toLowerCase().includes(search.toLowerCase()) ||
-    b.pincode.includes(search) ||
-    b.code.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = baseBranches.filter((b: Branch) => {
+    const matchesSearch = !search || 
+      b.name.toLowerCase().includes(search.toLowerCase()) ||
+      b.city.toLowerCase().includes(search.toLowerCase()) ||
+      b.pincode.includes(search) ||
+      b.code.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesLoc = !locationFilter || 
+      b.city.toLowerCase().includes(locationFilter.toLowerCase()) ||
+      (b.state || '').toLowerCase().includes(locationFilter.toLowerCase()) ||
+      b.pincode.includes(locationFilter);
+      
+    const isPartner = !!(b as any).isPartnerLab;
+    const matchesType = typeFilter === 'all' ? true : (typeFilter === 'partner' ? isPartner : !isPartner);
+    
+    return matchesSearch && matchesLoc && matchesType;
+  });
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true); };
   const openEdit = (b: Branch) => {
@@ -276,16 +289,36 @@ export default function Branches() {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+      {/* Search Bar & Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            placeholder="Search by name, city, pincode..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+        
         <input
           type="text"
-          placeholder="Search by name, city, pincode..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          placeholder="Filter Location (City/Pincode)"
+          value={locationFilter}
+          onChange={e => setLocationFilter(e.target.value)}
+          className="border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-56"
         />
+        
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value as any)}
+          className="border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-full sm:w-48 cursor-pointer"
+        >
+          <option value="all">All Branch Types</option>
+          <option value="admin">Admin Owned</option>
+          <option value="partner">Lab Partner</option>
+        </select>
       </div>
 
       {/* Stats Cards */}
@@ -330,7 +363,14 @@ export default function Branches() {
               {filtered.map((b: Branch) => (
                 <tr key={b.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-gray-900">{b.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold text-gray-900">{b.name}</div>
+                      {(b as any).isPartnerLab ? (
+                        <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full uppercase">Partner Lab</span>
+                      ) : (
+                        <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full uppercase">Admin Owned</span>
+                      )}
+                    </div>
                     <div className="text-xs text-gray-400 mt-0.5">{b.code}</div>
                   </td>
                   <td className="px-4 py-3">
