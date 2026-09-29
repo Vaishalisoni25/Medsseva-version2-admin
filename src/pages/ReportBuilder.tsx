@@ -543,8 +543,23 @@ export const ReportBuilderPage: React.FC = () => {
       const allStaff = Array.isArray(res) ? res : (res?.data && Array.isArray(res.data) ? res.data : []);
       const branchTechs = allStaff.filter((s: any) => {
         const matchesBranch = isPartner ? s.partnerId === branchId : (s.branchId === branchId || s.branch?.id === branchId);
-        const text = `${s.designation || ''} ${s.department || ''} ${s.role?.name || ''} ${s.role?.slug || ''}`.toLowerCase();
-        return matchesBranch && /technician|technologist|lab|pathology/i.test(text);
+        if (!matchesBranch) return false;
+
+        const designation = (s.designation || '').toLowerCase();
+        const roleName = (s.role?.name || s.role?.slug || '').toLowerCase();
+        const dept = (s.department || '').toLowerCase();
+
+        // 1. Strictly exclude phlebotomists, sample collectors, drivers, receptionists
+        const isPhleboOrCollector = /phlebotomist|collector|sample\s*collector|rider|driver|reception|executive|delivery/i.test(designation) ||
+          /phlebotomist|sample_collector/i.test(roleName);
+        if (isPhleboOrCollector) return false;
+
+        // 2. Strictly include Lab Technicians, Technologists, DMLT/BMLT, Lab Incharge, Pathologists
+        const isTech = /technician|technologist|lab\s*tech|dmlt|bmlt|lab\s*incharge|pathologist/i.test(designation) ||
+          /technician|technologist|lab_tech|pathologist/i.test(roleName) ||
+          (/technician|technologist/i.test(dept) && !isPhleboOrCollector);
+
+        return isTech;
       });
       
       // If it's a partner lab, add the partner themselves as a technician option
@@ -643,28 +658,60 @@ export const ReportBuilderPage: React.FC = () => {
         resolvedExistingBranchId = existingReport.reportBranch.id;
       }
 
+      const defaultTech = availableTechnicians.find(t => t.id === selectedTechnicianId) || availableTechnicians[0];
+      const defaultDoc = availableDoctors.find(d => d.id === selectedDoctorId) || availableDoctors[0];
+
+      const techNameToUse = techName || defaultTech?.user?.name || defaultTech?.name || '';
+      const techQualToUse = (techQual && techQual !== 'DMLT') ? techQual : (defaultTech?.qualification || 'DMLT');
+      const techSigToUse = techSig || defaultTech?.signatureUrl || '';
+
+      const docNameToUse = existingReport.doctorName || defaultDoc?.name || '';
+      const docQualToUse = existingReport.doctorQualification || defaultDoc?.qualification || '';
+      const docRegToUse = existingReport.doctorRegNo || defaultDoc?.registrationNo || '';
+      const docDesigToUse = existingReport.doctorDesignation || defaultDoc?.designation || 'Senior Pathologist';
+      const docSigToUse = existingReport.doctorSignatureUrl || (existingReport as any).signatureUrl || defaultDoc?.signatureUrl || '';
+
       setVerification({
         reportBranchId: resolvedExistingBranchId || fallbackBranchId,
-        doctorName: existingReport.doctorName || '',
-        doctorQualification: existingReport.doctorQualification || '',
-        doctorRegNo: existingReport.doctorRegNo || '',
-        doctorDesignation: existingReport.doctorDesignation || '',
+        doctorName: docNameToUse,
+        doctorQualification: docQualToUse,
+        doctorRegNo: docRegToUse,
+        doctorDesignation: docDesigToUse,
         doctorVerifiedAt: existingReport.doctorVerifiedAt || new Date().toISOString(),
-        doctorSignatureUrl: existingReport.doctorSignatureUrl || (existingReport as any).signatureUrl || '',
-        technicianName: techName,
-        technicianQualification: techQual,
-        technicianSignatureUrl: techSig,
+        doctorSignatureUrl: docSigToUse,
+        technicianName: techNameToUse,
+        technicianQualification: techQualToUse,
+        technicianSignatureUrl: techSigToUse,
       });
+      if (defaultTech && !selectedTechnicianId) setSelectedTechnicianId(defaultTech.id);
+      if (defaultDoc && !selectedDoctorId) setSelectedDoctorId(defaultDoc.id);
     } else {
       setReportTemplate('STANDARD');
       setTestGroups(buildTestGroups(booking));
       setNotes({ clinicalNotes: '', technicianRemarks: '', doctorRemarks: '', internalNotes: '' });
-  const defaultBranchId = booking.collectionMode === 'HOME'
+      const defaultBranchId = booking.collectionMode === 'HOME'
         ? (booking.sampleDelivery?.branch?.id || '')
         : (booking.branchId || '');
-      setVerification({ ...emptyVerification(), reportBranchId: defaultBranchId });
+
+      const defaultTech = availableTechnicians.find(t => t.id === selectedTechnicianId) || availableTechnicians[0];
+      const defaultDoc = availableDoctors.find(d => d.id === selectedDoctorId) || availableDoctors[0];
+
+      setVerification({
+        ...emptyVerification(),
+        reportBranchId: defaultBranchId,
+        technicianName: defaultTech?.user?.name || defaultTech?.name || '',
+        technicianQualification: defaultTech?.qualification || 'DMLT',
+        technicianSignatureUrl: defaultTech?.signatureUrl || '',
+        doctorName: defaultDoc?.name || '',
+        doctorQualification: defaultDoc?.qualification || '',
+        doctorRegNo: defaultDoc?.registrationNo || '',
+        doctorDesignation: defaultDoc?.designation || 'Senior Pathologist',
+        doctorSignatureUrl: defaultDoc?.signatureUrl || '',
+      });
+      if (defaultTech) setSelectedTechnicianId(defaultTech.id);
+      if (defaultDoc) setSelectedDoctorId(defaultDoc.id);
     }
-  }, [reports]);
+  }, [reports, availableTechnicians, availableDoctors, selectedTechnicianId, selectedDoctorId]);
 
   const updateParam = (groupIdx: number, paramIdx: number, patch: Partial<ParameterEntry>) => {
     setTestGroups(prev => prev.map((g, gi) => gi !== groupIdx ? g : {
